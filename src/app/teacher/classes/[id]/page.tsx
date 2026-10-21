@@ -199,7 +199,7 @@ export default async function ClassPage({
               className="textarea text-sm"
               placeholder={"Amina Begić\nTarik Čengić\nLejla Dedić"}
             />
-            <p className="mt-1.5 text-[11px] text-muted">
+            <p className="mt-1.5 text-[0.72rem] text-muted">
               Jedno ime po liniji. Duplikati se preskaču.
             </p>
             <div className="mt-3 flex justify-end">
@@ -290,7 +290,7 @@ export default async function ClassPage({
                 </div>
               </div>
               <div className="mt-3 flex items-center justify-between gap-3">
-                <p className="text-[11px] text-muted">
+                <p className="text-[0.72rem] text-muted">
                   Sesija se otvara odmah, a tajmer kreće kad pritisneš „Počni“.
                 </p>
                 <SubmitButton pendingLabel="Otvaram…">
@@ -339,7 +339,7 @@ export default async function ClassPage({
                         <span className="block text-sm font-semibold tabular-nums">
                           {average === null ? "—" : average.toFixed(1)}
                         </span>
-                        <span className="block text-[10px] uppercase tracking-wide text-muted">
+                        <span className="block font-sans text-[0.7rem] text-muted">
                           prosjek
                         </span>
                       </span>

@@ -668,7 +668,7 @@ export function StudentApp({ code }: { code: string }) {
         {phase === "pick" && join ? (
           <div>
             <div className="text-center">
-              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-forest">
+              <p className="font-sans text-xs text-forest">
                 {join.session.className}
               </p>
               <h1 className="mt-1 text-xl font-semibold tracking-tight">
@@ -720,7 +720,7 @@ export function StudentApp({ code }: { code: string }) {
                 >
                   <span className="min-w-0 truncate">{student.name}</span>
                   {student.taken ? (
-                    <span className="shrink-0 text-[9px] font-bold uppercase tracking-wide text-muted">
+                    <span className="shrink-0 font-sans text-[0.65rem] text-muted">
                       zauzeto
                     </span>
                   ) : (
@@ -736,7 +736,7 @@ export function StudentApp({ code }: { code: string }) {
               </p>
             ) : null}
 
-            <p className="mt-5 text-center text-[11px] leading-relaxed text-muted">
+            <p className="mt-5 text-center text-[0.72rem] leading-relaxed text-muted">
               Ime se veže za ovaj telefon za vrijeme testa i ne može se mijenjati.
               Ako pogriješiš, javi nastavniku.
             </p>
@@ -756,18 +756,18 @@ export function StudentApp({ code }: { code: string }) {
               Nastavnik će pokrenuti test. Tajmer kreće za sve u isto vrijeme.
             </p>
             <div className="mt-5 rounded-sm border border-rule bg-paper/60 px-3 py-2.5">
-              <p className="text-[10px] font-bold uppercase tracking-wide text-muted">
+              <p className="font-sans text-[0.7rem] text-muted">
                 Prijavljen kao
               </p>
               <p className="mt-0.5 text-sm font-semibold">
                 {attempt?.studentName ?? "—"}
               </p>
             </div>
-            <p className="mt-4 text-[11px] text-muted">
+            <p className="mt-4 text-[0.72rem] text-muted">
               Ne zatvaraj stranicu. Kada test počne, pitanja se pojavljuju sama.
             </p>
             {error ? (
-              <p className="mt-3 text-[11px] text-pencil">{error}</p>
+              <p className="mt-3 text-[0.72rem] text-pencil">{error}</p>
             ) : null}
           </div>
         ) : null}
@@ -777,7 +777,7 @@ export function StudentApp({ code }: { code: string }) {
             <div className="sticky top-0 z-20 border-b border-rule bg-paper/95 px-4 pb-2 pt-3 backdrop-blur">
               <div className="mx-auto flex w-full max-w-lg items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="truncate text-[11px] font-medium text-muted">
+                  <p className="truncate text-[0.72rem] font-medium text-muted">
                     {attempt?.studentName}
                   </p>
                   <p className="truncate text-sm font-semibold">
@@ -827,7 +827,7 @@ export function StudentApp({ code }: { code: string }) {
                   return (
                     <section key={question.id} className="card p-4">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted">
+                        <span className="font-sans text-[0.7rem] text-muted">
                           Pitanje {index + 1} od {questions.length}
                         </span>
                         <span className="badge border-rule bg-paper text-muted">
@@ -924,7 +924,7 @@ export function StudentApp({ code }: { code: string }) {
                                   {question.type === "single" ? (
                                     <span
                                       className={clsx(
-                                        "grid h-6 w-6 shrink-0 place-items-center border font-data text-[11px]",
+                                        "grid h-6 w-6 shrink-0 place-items-center border font-data text-[0.72rem]",
                                         active
                                           ? "border-forest bg-forest text-paper"
                                           : "border-rule-soft bg-paper text-muted",
@@ -956,7 +956,7 @@ export function StudentApp({ code }: { code: string }) {
                 })}
               </div>
 
-              <div className="mt-4 flex items-center justify-between gap-2 text-[11px]">
+              <div className="mt-4 flex items-center justify-between gap-2 text-[0.72rem]">
                 <span className="inline-flex items-center gap-1.5 text-muted">
                   {saveState === "saving" ? (
                     <>

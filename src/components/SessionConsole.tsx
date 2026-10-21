@@ -224,23 +224,23 @@ export function SessionConsole({
           </p>
 
           <div className="mt-4 rounded-sm border border-rule bg-paper/60 px-3 py-2">
-            <p className="truncate font-mono text-[11px] text-muted">{joinUrl}</p>
+            <p className="truncate font-data text-[0.72rem] text-muted">{joinUrl}</p>
             <div className="mt-1.5 flex items-center justify-between gap-2">
               <CopyButton
                 value={joinUrl}
-                className="inline-flex items-center gap-1 text-[11px] font-semibold text-forest hover:text-forest-deep"
+                className="inline-flex items-center gap-1 text-[0.72rem] font-semibold text-forest hover:text-forest-deep"
               />
               <Link
                 href={joinUrl}
                 target="_blank"
-                className="inline-flex items-center gap-1 text-[11px] font-semibold text-muted hover:text-ink"
+                className="inline-flex items-center gap-1 text-[0.72rem] font-semibold text-muted hover:text-ink"
               >
                 Otvori <ExternalLink className="h-3 w-3" />
               </Link>
             </div>
           </div>
 
-          <p className="mt-3 text-center text-[11px] leading-relaxed text-muted">
+          <p className="mt-3 text-center text-[0.72rem] leading-relaxed text-muted">
             Učenici skeniraju kod ili otvore link, izaberu svoje ime i čekaju
             početak.
           </p>
@@ -254,7 +254,7 @@ export function SessionConsole({
 
           <dl className="mt-4 grid grid-cols-2 gap-3">
             <div className="rounded-sm bg-paper/70 px-3 py-2.5">
-              <dt className="text-[10px] font-bold uppercase tracking-wide text-muted">
+              <dt className="font-sans text-[0.7rem] text-muted">
                 Ušlo
               </dt>
               <dd className="mt-0.5 text-lg font-semibold tabular-nums">
@@ -265,7 +265,7 @@ export function SessionConsole({
               </dd>
             </div>
             <div className="rounded-sm bg-paper/70 px-3 py-2.5">
-              <dt className="text-[10px] font-bold uppercase tracking-wide text-muted">
+              <dt className="font-sans text-[0.7rem] text-muted">
                 Predalo
               </dt>
               <dd className="mt-0.5 text-lg font-semibold tabular-nums">
@@ -308,7 +308,7 @@ export function SessionConsole({
                 )}
                 Počni test
               </button>
-              <p className="mt-2 text-center text-[11px] text-muted">
+              <p className="mt-2 text-center text-[0.72rem] text-muted">
                 {joined.length === 0
                   ? "Sačekaj da se prvi učenik prijavi."
                   : "Tajmer kreće za sve u istom trenutku."}
@@ -328,7 +328,7 @@ export function SessionConsole({
                       : "bg-forest-wash text-forest-deep",
                 )}
               >
-                <p className="text-[10px] font-bold uppercase tracking-[0.12em] opacity-70">
+                <p className="text-[10px] font-bold tracking-[0.12em] opacity-70">
                   Preostalo
                 </p>
                 <p className="font-mono text-3xl font-bold tabular-nums">
@@ -339,7 +339,7 @@ export function SessionConsole({
               </div>
 
               {remainingSeconds === 0 ? (
-                <p className="mt-2 text-center text-[11px] font-semibold text-pencil">
+                <p className="mt-2 text-center text-[0.72rem] font-semibold text-pencil">
                   Vrijeme je isteklo — učenici mogu samo predati.
                 </p>
               ) : null}
@@ -380,7 +380,7 @@ export function SessionConsole({
                 <CheckCircle2 className="h-4 w-4" />
                 Pogledaj rezultate
               </Link>
-              <p className="mt-2 text-center text-[11px] text-muted">
+              <p className="mt-2 text-center text-[0.72rem] text-muted">
                 Test je zaključan. Odgovori se više ne primaju.
               </p>
             </div>
@@ -419,7 +419,7 @@ export function SessionConsole({
           <div className="overflow-x-auto">
             <table className="w-full min-w-[30rem] border-collapse text-sm">
               <thead>
-                <tr className="border-b border-rule bg-paper/60 text-left text-[10px] uppercase tracking-wide text-muted">
+                <tr className="border-b border-rule bg-paper/60 text-left font-sans text-[0.7rem] text-muted">
                   <th className="px-4 py-2 font-bold">Učenik</th>
                   <th className="px-3 py-2 font-bold">Status</th>
                   <th className="px-3 py-2 text-center font-bold">Odgovori</th>
@@ -532,7 +532,7 @@ export function SessionConsole({
                 }}
               />
             </div>
-            <p className="mt-2 text-[11px] text-muted">
+            <p className="mt-2 text-[0.72rem] text-muted">
               Predalo {submitted.length} od {session.totalStudents} učenika.
               Rezultati se osvježavaju svake dvije sekunde.
             </p>

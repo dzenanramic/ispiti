@@ -52,7 +52,7 @@ export function ChangePasswordForm() {
           minLength={8}
           className="input"
         />
-        <p className="mt-1 text-[11px] text-muted">Najmanje 8 znakova.</p>
+        <p className="mt-1 text-[0.72rem] text-muted">Najmanje 8 znakova.</p>
       </div>
       <div>
         <label htmlFor="repeat" className="label">

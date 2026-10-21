@@ -391,7 +391,7 @@ export function QuizEditor({ initial }: { initial: InitialQuiz | null }) {
             </button>
           </div>
 
-          <pre className="mt-3 overflow-x-auto rounded-sm border border-rule bg-lift p-3 text-[11px] leading-relaxed text-muted">
+          <pre className="mt-3 overflow-x-auto rounded-sm border border-rule bg-lift p-3 text-[0.72rem] leading-relaxed text-muted">
 {`1. Koji su osnovni dijelovi hadisa?
 A) Isnad i matn
 B) Sened i šerh
@@ -540,7 +540,7 @@ Tačno: isnad`}
               </div>
             ) : (
               <div className="mt-3">
-                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
+                <p className="mb-2 text-[0.72rem] font-semibold text-muted">
                   {question.type === "cloze"
                     ? "Ponuđene riječi — označi tačnu"
                     : "Opcije — označi tačnu"}

@@ -27,7 +27,7 @@ export default async function AccountPage() {
             {user.role === "admin" ? "Administrator" : "Nastavnik"} · pristup
             odjeljenjima i kvizovima vezanim za ovaj nalog.
           </p>
-          <p className="mt-4 rounded-xs bg-paper/70 px-3 py-2 text-[11px] leading-relaxed text-muted">
+          <p className="mt-4 rounded-xs bg-paper/70 px-3 py-2 text-[0.72rem] leading-relaxed text-muted">
             Ako si zaboravio lozinku, administrator je može resetovati bez
             pristupa tvom emailu.
           </p>

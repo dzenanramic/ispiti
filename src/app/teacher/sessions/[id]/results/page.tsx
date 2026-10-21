@@ -191,7 +191,7 @@ export default async function ResultsPage({
         <div className="overflow-x-auto">
           <table className="w-full min-w-[40rem] border-collapse text-sm">
             <thead>
-              <tr className="border-b border-rule bg-paper/60 text-[10px] uppercase tracking-wide text-muted">
+              <tr className="border-b border-rule bg-paper/60 font-sans text-[0.7rem] text-muted">
                 <th className="sticky left-0 z-10 bg-paper/95 px-4 py-2.5 text-left font-bold">
                   Učenik
                 </th>

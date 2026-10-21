@@ -1,13 +1,13 @@
 import { and, eq, inArray } from "drizzle-orm";
 import Link from "next/link";
-import { ArrowRight, BookOpen, Plus, Users } from "lucide-react";
+import { Plus } from "lucide-react";
 import { db } from "@/db";
 import { classes, sessions, students, teachers } from "@/db/schema";
 import { createClassAction } from "@/app/actions/classes";
 import { SubmitButton } from "@/components/SubmitButton";
 import { Banner, EmptyState, PageHeader } from "@/components/ui";
 import { requireUser } from "@/lib/guard";
-import { currentSchoolYear, testWord } from "@/lib/format";
+import { testWord } from "@/lib/format";
 
 export const metadata = { title: "Odjeljenja" };
 
@@ -92,7 +92,7 @@ export default async function ClassesPage({
           description="Dodaj prvo odjeljenje iznad, pa zalijepi spisak učenika."
         />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
+        <ul className="border-t border-rule">
           {classRows.map((cls) => {
             const studentCount = studentRows.filter(
               (student) => student.classId === cls.id,
@@ -107,53 +107,34 @@ export default async function ClassesPage({
             );
 
             return (
-              <Link
-                key={cls.id}
-                href={`/teacher/classes/${cls.id}`}
-                data-nav-link="true"
-                className="sheet group flex flex-col p-5 transition-shadow hover:shadow-md"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-muted">
-                      {cls.schoolYear}
-                    </p>
-                    <h2 className="mt-1 text-lg font-semibold tracking-tight">
+              <li key={cls.id} className="border-b border-rule-soft">
+                <Link
+                  href={`/teacher/classes/${cls.id}`}
+                  className="group grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-3 py-4 transition-colors hover:text-forest-deep"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate text-[1.35rem] leading-tight">
                       {cls.name}
-                    </h2>
-                    {user.role === "admin" ? (
-                      <p className="mt-0.5 text-xs text-muted">{cls.teacherName}</p>
-                    ) : null}
-                  </div>
-                  {activeTest ? (
-                    <span className="badge border-forest/30 bg-forest-wash text-forest-deep">
-                      <span className="h-1.5 w-1.5 rounded-full bg-forest" />
-                      aktivan test
                     </span>
-                  ) : (
-                    <ArrowRight className="h-4 w-4 text-muted transition-transform group-hover:translate-x-0.5" />
-                  )}
-                </div>
-
-                <div className="mt-5 flex items-center gap-4 text-xs text-muted">
-                  <span className="inline-flex items-center gap-1.5">
-                    <Users className="h-3.5 w-3.5" />
-                    {studentCount} učenika
+                    <span className="mt-0.5 block font-sans text-xs text-muted">
+                      {cls.schoolYear}
+                      {user.role === "admin" ? ` · ${cls.teacherName}` : ""} ·{" "}
+                      {studentCount} učenika · {testCount} {testWord(testCount)}
+                    </span>
                   </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <BookOpen className="h-3.5 w-3.5" />
-                    {testCount} {testWord(testCount)}
+                  <span className="font-sans text-xs text-ink-soft">
+                    {activeTest ? "test je otvoren" : "bez otvorenog testa"}
                   </span>
-                </div>
-              </Link>
+                </Link>
+              </li>
             );
           })}
-        </div>
+        </ul>
       )}
 
-      <p className="mt-6 text-xs text-muted">
-        Školska godina {currentSchoolYear()} · odjeljenja se ne brišu, učenici se
-        deaktiviraju da bi ostala historija.
+      <p className="mt-6 font-sans text-xs text-muted">
+        Odjeljenja se ne brišu. Učenika koji napusti razred deaktiviraj — historija
+        testova ostaje sačuvana.
       </p>
     </>
   );

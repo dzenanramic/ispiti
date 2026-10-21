@@ -215,7 +215,7 @@ export default async function SuccessPage({
           <div className="overflow-x-auto">
             <table className="w-full min-w-[36rem] border-collapse text-sm">
               <thead>
-                <tr className="border-b border-rule bg-paper/60 text-left text-[11px] uppercase tracking-wide text-muted">
+                <tr className="border-b border-rule bg-paper/60 text-left font-sans text-[0.7rem] text-muted">
                   <th className="sticky left-0 z-10 bg-paper/95 px-4 py-2.5 font-bold">
                     Učenik
                   </th>
