@@ -108,11 +108,19 @@ export default async function ClassPage({
         }
         actions={
           <>
-            <Link href={`/teacher/classes/${cls.id}/grades`} className="btn btn-secondary">
+            <Link
+              href={`/teacher/classes/${cls.id}/grades`}
+              data-nav-link="true"
+              className="btn btn-secondary"
+            >
               <Trophy className="h-4 w-4" />
               Uspjeh
             </Link>
-            <Link href="/teacher/quizzes/new" className="btn btn-primary">
+            <Link
+              href="/teacher/quizzes/new"
+              data-nav-link="true"
+              className="btn btn-primary"
+            >
               <Plus className="h-4 w-4" />
               Novi kviz
             </Link>
@@ -126,6 +134,7 @@ export default async function ClassPage({
         </span>
         <Link
           href={`/teacher/classes/${cls.id}/grades`}
+          data-nav-link="true"
           className="px-3 py-2 text-muted transition-colors hover:text-ink"
         >
           Uspjeh
@@ -241,7 +250,11 @@ export default async function ClassPage({
                 title="Nema spremnih kvizova"
                 description="Napravi kviz, pa se vrati ovdje da pokreneš test."
               >
-                <Link href="/teacher/quizzes/new" className="btn btn-primary">
+                <Link
+              href="/teacher/quizzes/new"
+              data-nav-link="true"
+              className="btn btn-primary"
+            >
                   <Plus className="h-4 w-4" />
                   Napravi kviz
                 </Link>
@@ -311,6 +324,7 @@ export default async function ClassPage({
                   <li key={session.id}>
                     <Link
                       href={`/teacher/sessions/${session.id}`}
+                      data-nav-link="true"
                       className="flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-paper/60"
                     >
                       <span className="min-w-0 flex-1">

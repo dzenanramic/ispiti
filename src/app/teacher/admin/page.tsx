@@ -140,6 +140,7 @@ export default async function AdminPage() {
               <li key={cls.id}>
                 <Link
                   href={`/teacher/classes/${cls.id}`}
+                  data-nav-link="true"
                   className="flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-paper/60"
                 >
                   <span className="min-w-0 flex-1">

@@ -11,6 +11,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { clsx } from "clsx";
+import { NavigationDone, useNavPending } from "./NavigationProgress";
 
 type Item = {
   href: string;
@@ -35,15 +36,18 @@ export function SidebarNav({
   variant?: "sidebar" | "mobile";
 }) {
   const pathname = usePathname();
+  const pending = useNavPending();
 
   return (
     <nav
       className={clsx(
-        "flex gap-1",
+        "relative flex gap-1",
         variant === "sidebar" ? "flex-col" : "overflow-x-auto",
       )}
       aria-label="Glavna navigacija"
+      aria-busy={pending}
     >
+      <NavigationDone />
       {items
         .filter((item) => !item.adminOnly || role === "admin")
         .map((item) => {
@@ -57,6 +61,7 @@ export function SidebarNav({
             <Link
               key={item.href}
               href={item.href}
+              data-nav-link="true"
               aria-current={active ? "page" : undefined}
               className={clsx(
                 "inline-flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition-colors",

@@ -131,6 +131,7 @@ export default async function ResultsPage({
     <>
       <Link
         href={`/teacher/sessions/${session.id}`}
+        data-nav-link="true"
         className="mb-4 inline-flex items-center gap-1.5 text-xs font-semibold text-muted hover:text-ink no-print"
       >
         <ArrowLeft className="h-3.5 w-3.5" />
@@ -153,6 +154,7 @@ export default async function ResultsPage({
             </a>
             <Link
               href={`/teacher/classes/${session.classId}/grades`}
+              data-nav-link="true"
               className="btn btn-primary no-print"
             >
               Uspjeh

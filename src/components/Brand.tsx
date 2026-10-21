@@ -30,6 +30,7 @@ export function Brand({
   return (
     <Link
       href={href}
+      data-nav-link="true"
       className={clsx(
         "inline-flex items-center gap-2.5 rounded-xl",
         inverted ? "text-white" : "text-ink",

@@ -111,6 +111,7 @@ export default async function ClassesPage({
               <Link
                 key={cls.id}
                 href={`/teacher/classes/${cls.id}`}
+                data-nav-link="true"
                 className="card group flex flex-col p-5 transition-shadow hover:shadow-md"
               >
                 <div className="flex items-start justify-between gap-3">

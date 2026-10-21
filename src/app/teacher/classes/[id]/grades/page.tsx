@@ -165,6 +165,7 @@ export default async function SuccessPage({
       <div className="mb-6 flex gap-1 border-b border-line text-sm">
         <Link
           href={`/teacher/classes/${cls.id}`}
+          data-nav-link="true"
           className="px-3 py-2 text-muted transition-colors hover:text-ink"
         >
           Učenici i testovi

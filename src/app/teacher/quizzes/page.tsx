@@ -56,7 +56,7 @@ export default async function QuizzesPage() {
         title="Kvizovi"
         description="Kviz je skup pitanja koja ponavljaš iz odjeljenja u odjeljenje. Test je jedna sesija tog kviza."
         actions={
-          <Link href="/teacher/quizzes/new" className="btn btn-primary">
+          <Link href="/teacher/quizzes/new" data-nav-link="true" className="btn btn-primary">
             <Plus className="h-4 w-4" />
             Novi kviz
           </Link>
@@ -69,7 +69,7 @@ export default async function QuizzesPage() {
           title="Još nema kvizova"
           description="Napravi prvi kviz — pet pitanja je dovoljno za pet minuta."
         >
-          <Link href="/teacher/quizzes/new" className="btn btn-primary">
+          <Link href="/teacher/quizzes/new" data-nav-link="true" className="btn btn-primary">
             <Plus className="h-4 w-4" />
             Napravi kviz
           </Link>
@@ -118,6 +118,7 @@ export default async function QuizzesPage() {
                     ) : (
                       <Link
                         href={`/teacher/quizzes/${quiz.id}`}
+                        data-nav-link="true"
                         className="btn btn-secondary !py-1.5 text-xs"
                       >
                         <Pencil className="h-3.5 w-3.5" />

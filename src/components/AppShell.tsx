@@ -1,8 +1,12 @@
+"use client";
+
+import { usePathname } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { logoutAction } from "@/app/actions/auth";
 import type { SessionUser } from "@/lib/auth";
 import { initials } from "@/lib/format";
 import { Brand } from "./Brand";
+import { NavigationProvider } from "./NavigationProgress";
 import { SidebarNav } from "./SidebarNav";
 
 export function AppShell({
@@ -12,7 +16,11 @@ export function AppShell({
   user: SessionUser;
   children: React.ReactNode;
 }) {
+  // Promjena putanje = stigla je nova stranica; gasimo indikator učitavanja.
+  const pathname = usePathname();
+
   return (
+    <NavigationProvider>
     <div className="min-h-screen lg:grid lg:grid-cols-[260px_minmax(0,1fr)]">
       <aside className="sticky top-0 hidden h-screen flex-col border-r border-line bg-white/55 px-4 py-5 lg:flex">
         <div className="px-2">
@@ -66,10 +74,14 @@ export function AppShell({
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 lg:px-10 lg:py-10">
+        <main
+          key={pathname}
+          className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 lg:px-10 lg:py-10 animate-[fade-in_180ms_ease-out]"
+        >
           {children}
         </main>
       </div>
     </div>
+    </NavigationProvider>
   );
 }

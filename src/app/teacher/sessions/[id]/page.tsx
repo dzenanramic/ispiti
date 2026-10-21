@@ -133,6 +133,7 @@ export default async function SessionPage({
     <>
       <Link
         href={`/teacher/classes/${session.classId}`}
+        data-nav-link="true"
         className="mb-4 inline-flex items-center gap-1.5 text-xs font-semibold text-muted hover:text-ink"
       >
         <ArrowLeft className="h-3.5 w-3.5" />
@@ -146,6 +147,7 @@ export default async function SessionPage({
         actions={
           <Link
             href={`/teacher/sessions/${session.id}/results`}
+            data-nav-link="true"
             className="btn btn-secondary"
           >
             <ClipboardList className="h-4 w-4" />

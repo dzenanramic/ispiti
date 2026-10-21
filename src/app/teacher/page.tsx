@@ -128,11 +128,11 @@ export default async function TeacherHomePage() {
         description="Pregled odjeljenja, kvizova i zadnjih testova. Test za čas pripremaš za nekoliko minuta."
         actions={
           <>
-            <Link href="/teacher/quizzes/new" className="btn btn-primary">
+            <Link href="/teacher/quizzes/new" data-nav-link="true" className="btn btn-primary">
               <Plus className="h-4 w-4" />
               Novi kviz
             </Link>
-            <Link href="/teacher/classes" className="btn btn-secondary">
+            <Link href="/teacher/classes" data-nav-link="true" className="btn btn-secondary">
               Odjeljenja
             </Link>
           </>
@@ -142,6 +142,7 @@ export default async function TeacherHomePage() {
       {openSession ? (
         <Link
           href={`/teacher/sessions/${openSession.id}`}
+          data-nav-link="true"
           className="mb-6 flex flex-col gap-2 rounded-2xl border border-emerald-200 bg-brand-soft px-4 py-3.5 text-brand-dark transition-colors hover:bg-emerald-100/70 sm:flex-row sm:items-center sm:justify-between"
         >
           <div className="flex items-center gap-3">
@@ -209,7 +210,7 @@ export default async function TeacherHomePage() {
                 title="Još nema testova"
                 description="Kreiraj kviz, izaberi odjeljenje i pokreni prvi petominutni test."
               >
-                <Link href="/teacher/quizzes/new" className="btn btn-primary">
+                <Link href="/teacher/quizzes/new" data-nav-link="true" className="btn btn-primary">
                   <Plus className="h-4 w-4" />
                   Napravi kviz
                 </Link>
@@ -221,6 +222,7 @@ export default async function TeacherHomePage() {
                 <li key={session.id}>
                   <Link
                     href={`/teacher/sessions/${session.id}`}
+                    data-nav-link="true"
                     className="flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-paper/60"
                   >
                     <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-paper text-muted">
@@ -249,6 +251,7 @@ export default async function TeacherHomePage() {
             <div className="mt-3 grid gap-2">
               <Link
                 href="/teacher/quizzes/new"
+                data-nav-link="true"
                 className="flex items-center gap-3 rounded-xl border border-line px-3.5 py-3 text-sm font-medium transition-colors hover:border-brand/30 hover:bg-brand-soft/40"
               >
                 <span className="grid h-8 w-8 place-items-center rounded-lg bg-brand-soft text-brand">
@@ -259,6 +262,7 @@ export default async function TeacherHomePage() {
               </Link>
               <Link
                 href="/teacher/classes"
+                data-nav-link="true"
                 className="flex items-center gap-3 rounded-xl border border-line px-3.5 py-3 text-sm font-medium transition-colors hover:border-brand/30 hover:bg-brand-soft/40"
               >
                 <span className="grid h-8 w-8 place-items-center rounded-lg bg-brand-soft text-brand">
@@ -300,6 +304,7 @@ export default async function TeacherHomePage() {
                 <h2 className="text-sm font-semibold">Odjeljenja</h2>
                 <Link
                   href="/teacher/classes"
+                  data-nav-link="true"
                   className="text-xs font-semibold text-brand hover:text-brand-dark"
                 >
                   Sve
@@ -310,6 +315,7 @@ export default async function TeacherHomePage() {
                   <Link
                     key={cls.id}
                     href={`/teacher/classes/${cls.id}`}
+                    data-nav-link="true"
                     className="flex items-center justify-between rounded-lg px-1 py-1.5 text-sm transition-colors hover:text-brand"
                   >
                     <span className="truncate">{cls.name}</span>
