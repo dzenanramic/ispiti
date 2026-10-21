@@ -131,7 +131,7 @@ Sa pokrenutim `npm run dev` i demo podacima:
 node scripts/e2e.mjs
 ```
 
-Skripta prolazi cijeli tok (prijava, uvoz pitanja, sesija, učenički ulazak, odgovori, predaja, rezultati, ocjene, admin) i snima ekrane u `.screenshots/`. Napravi jedan probni kviz i sesiju — ne diraj je u produkciji.
+Skripta prolazi cijeli tok (prijava, uvoz pitanja, sesija, učenički ulazak, odgovori, predaja, rezultati, uspjeh, admin) i snima ekrane u `.screenshots/`. Napravi jedan probni kviz i sesiju — ne diraj je u produkciji.
 
 ---
 
