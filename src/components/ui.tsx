@@ -74,7 +74,7 @@ export function StatRow({
       {items.map((item) => (
         <div key={item.label}>
           <dt className="font-sans text-xs text-muted">{item.label}</dt>
-          <dd className="mt-0.5 text-[1.65rem] leading-none">{item.value}</dd>
+          <dd className="mt-1 font-data text-[1.5rem] leading-none">{item.value}</dd>
           {item.hint ? (
             <p className="mt-1 font-sans text-xs text-muted">{item.hint}</p>
           ) : null}
