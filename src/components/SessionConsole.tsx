@@ -313,6 +313,19 @@ export function SessionConsole({
                   ? "Sačekaj da se prvi učenik prijavi."
                   : "Tajmer kreće za sve u istom trenutku."}
               </p>
+              <button
+                type="button"
+                onClick={close}
+                disabled={pending}
+                className="btn btn-danger mt-2 w-full !py-2 text-xs"
+              >
+                {pending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Square className="h-3 w-3" />
+                )}
+                Otkaži test
+              </button>
             </div>
           ) : null}
 

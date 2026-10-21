@@ -27,6 +27,16 @@ await Promise.all([
   teacher.click('button[type=submit]'),
 ]);
 
+// Close any open test from the demo seed so the new test can be opened.
+await teacher.goto(`${BASE}/teacher`, { waitUntil: 'networkidle' });
+const openTest = teacher.getByRole('link', { name: /Otvori test/ });
+if (await openTest.count()) {
+  await openTest.first().click();
+  await teacher.waitForURL('**/teacher/sessions/**', { timeout: 20000 });
+  await teacher.getByRole('button', { name: /Završi|Otkaži test/ }).first().click();
+  await teacher.waitForTimeout(2500);
+}
+
 // Quizzes list
 await teacher.goto(`${BASE}/teacher/quizzes`, { waitUntil: 'networkidle' });
 await shot(teacher, '03-quizzes');
@@ -38,6 +48,7 @@ await teacher.waitForLoadState('networkidle');
 await teacher.waitForTimeout(800);
 await teacher.fill('#title', QUIZ_TITLE);
 await teacher.fill('#lesson', 'Lekcija 1 — provjera');
+await teacher.selectOption('#classId', { label: '3. razred' });
 await teacher.getByRole('button', { name: /Uvezi iz teksta/ }).click();
 const template = `1. Hadis je riječ, djelo ili odobrenje Poslanika.
 Tačno: T
@@ -62,12 +73,12 @@ Tačno: A
 
 5. Matn je tekst hadisa.
 Tačno: T`;
-await teacher.locator('textarea[placeholder="Zalijepi tekst ovdje…"]').fill(template);
+await teacher.locator('#quiz-import').fill(template);
 await teacher.getByRole('button', { name: 'Dodaj pitanja', exact: true }).click();
 await teacher.waitForTimeout(500);
 await shot(teacher, '04-quiz-editor');
 
-await teacher.getByRole('button', { name: /Sačuvaj kviz/ }).first().click();
+await teacher.getByRole('button', { name: /^Sačuvaj$/ }).first().click();
 await teacher.waitForURL('**/teacher/quizzes', { timeout: 20000 });
 await teacher.waitForTimeout(800);
 await shot(teacher, '05-quizzes-after-save');
@@ -119,10 +130,10 @@ await teacher.waitForFunction(() => {
 await startButton.click();
 
 // Student starts
-await student.getByText('Pitanje 1 od 5').waitFor({ timeout: 15000 });
+await student.getByText(/PITANJE 1 OD 5/i).waitFor({ timeout: 15000 });
 await shot(student, '12-student-quiz-start', false);
 
-const sections = student.locator('main section.card');
+const sections = student.locator('main section');
 await sections.nth(0).getByRole('button', { name: 'Tačno', exact: true }).click();
 await sections.nth(1).getByRole('button', { name: /Isnad i matn/ }).click();
 await sections.nth(2).getByRole('button', { name: 'isnad', exact: true }).click();
@@ -149,7 +160,7 @@ await teacher.waitForURL('**/results');
 await teacher.waitForTimeout(800);
 await shot(teacher, '17-results');
 
-await teacher.getByRole('link', { name: /^Ocjene$/ }).first().click();
+await teacher.getByRole('link', { name: /^Uspjeh$/ }).first().click();
 await teacher.waitForURL('**/grades');
 await teacher.waitForTimeout(800);
 await shot(teacher, '18-grades');

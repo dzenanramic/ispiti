@@ -10,8 +10,8 @@ Aplikacija je napravljena za jednu školu i više nastavnika. Pilot predmet je h
 
 **Nastavnik**
 
-1. Napravi kviz — ručno kroz formu ili zalijepi pitanja iz teksta po šablonu.
-2. U odjeljenju izabere kviz i otvori sesiju. Dobije kod od 6 znakova i QR kod.
+1. Napravi kviz — ručno kroz formu ili zalijepi pitanja iz teksta po šablonu; odmah izabere razred kojem kviz pripada.
+2. Sačuva kviz i otvori test u tom razredu (ili to uradi kasnije iz liste kvizova). Dobije kod od 6 znakova i QR kod.
 3. Pritisne „Počni test" kada su učenici spremni. Tajmer kreće za sve u istom trenutku.
 4. Gleda uživo ko je ušao, ko je predao i koliko bodova ima. Na kraju vidi matricu odgovora po pitanju.
 
@@ -23,7 +23,7 @@ Aplikacija je napravljena za jednu školu i više nastavnika. Pilot predmet je h
 
 **Ocjena**
 
-Bodovi iz svih testova se sabiraju u tabeli odjeljenja. Nastavnik sam upisuje ocjenu (više ocjena po polugodištu je podržano) — aplikacija ne predlaže završnu ocjenu i nije povezana sa e-dnevnikom.
+Bodovi iz svih testova se sabiraju u pregledu uspjeha odjeljenja. Ocjenu i dalje daje nastavnik — aplikacija je ne upisuje, ne predlaže završnu ocjenu i nije povezana sa e-dnevnikom.
 
 ---
 
@@ -36,7 +36,8 @@ Bodovi iz svih testova se sabiraju u tabeli odjeljenja. Nastavnik sam upisuje oc
   - jedan tačan odgovor,
   - dopuna iz ponuđenih riječi (word bank — učenik tapne riječ, ne kuca).
 - Uvoz pitanja iz teksta po šablonu (vidi ispod).
-- Duplikovanje kviza za drugo odjeljenje; arhiviranje.
+- Kviz pripada jednom razredu; pokreće se samo u njemu. Za drugo odjeljenje duplikuj kviz i izmijeni pitanja.
+- „Sačuvaj i otvori test" odmah pravi lobby sesiju; ako razred već ima otvoren test, nudi se nastavak umjesto drugog koda.
 - Sesija: QR + 6-znakovni kod, lobby, sinhronizovani tajmer (3/5/6/10 min), zaključavanje ulaza, produženje vremena, poništavanje pokušaja, ručni upis rezultata za odsutne.
 - Učenik bez naloga: ime se veže za uređaj za tu sesiju, jedan pokušaj po učeniku.
 - Lokalno čuvanje odgovora: svaki odgovor se upisuje u `localStorage` prije slanja; poslije reloada se vraća i ponovo šalje. Predaja čeka da svi odgovori stignu na server.
@@ -118,7 +119,7 @@ Otvori <http://localhost:3000>.
 | Nastavnik | `profesor@ispiti.local` | `profesor123` |
 | Administrator | `admin@ispiti.local` | `admin123` |
 
-Demo podaci: 3. i 4. razred, po 20 učenika, 3 hadiska kviza, tri završena testa i otvorena sesija `TEST22` (3. razred) za probu učeničkog toka.
+Demo podaci: 3. i 4. razred, po 20 učenika, po dva kviza za svaki razred (različita pitanja), četiri završena testa i otvorena sesija `TEST22` (3. razred) za probu učeničkog toka.
 
 `npm run db:seed -- --reset` briše sve i ponovo puni demo podatke. **Ne pokretati u produkciji.**
 
@@ -205,13 +206,13 @@ DATABASE_URL="<pooler-url>" npm run db:password -- profesor@skola.ba "nova-lozin
 - `teachers` — nalozi, uloga `teacher`/`admin`, bcrypt hash.
 - `classes` — odjeljenje, školska godina, nastavnik.
 - `students` — učenik u odjeljenju, `active` za meko brisanje.
-- `quizzes` / `questions` — sadržaj kviza; pitanja se ne mijenjaju ako je kviz korišten (historija ostaje tačna).
+- `quizzes` / `questions` — sadržaj kviza i razred kojem pripada; pitanja se ne mijenjaju ako je kviz korišten (historija ostaje tačna).
 - `sessions` — izvođenje kviza u odjeljenju; kod, status, tajmer, zaključan ulaz.
 - `attempts` — jedan pokušaj učenika u sesiji; token uređaja, token pokušaja, bodovi.
 - `answers` — odgovor po pitanju, odmah ocijenjen.
 - `grades` — ocjene nastavnika, više po polugodištu.
 
-Kviz i sesija su odvojeni namjerno: isti kviz ide u 3. i 4. razred, a svako izvođenje ima svoje rezultate.
+Kviz pripada jednom razredu, a sesija je jedno izvođenje tog kviza. Ako isti sadržaj treba i drugom razredu, kviz se duplikuje — time se pitanja mogu prilagoditi razredu, a historija ostaje jasna.
 
 ---
 
@@ -248,7 +249,7 @@ src/
     api/              join, attempt, answer, submit, live, CSV
     j/[code]/         učenički ekran
     login/
-    teacher/          dashboard, odjeljenja, kvizovi, sesije, ocjene, admin, nalog
+    teacher/          dashboard, odjeljenja, kvizovi, sesije, uspjeh, admin, nalog
   components/         AppShell, QuizEditor, SessionConsole, UI
   db/                 schema, klijent, seed, CLI skripte
   lib/                auth, guard, parser pitanja, formatiranje, bodovanje
