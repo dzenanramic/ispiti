@@ -14,13 +14,13 @@ export function CreateTeacherForm() {
   return (
     <form action={formAction} className="space-y-3">
       {state.error ? (
-        <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-danger-soft px-3 py-2 text-xs text-danger">
+        <div className="flex items-start gap-2 rounded-sm border border-pencil/40 bg-pencil-wash px-3 py-2 text-xs text-pencil">
           <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           {state.error}
         </div>
       ) : null}
       {state.success ? (
-        <div className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-brand-soft px-3 py-2 text-xs text-brand-dark">
+        <div className="flex items-start gap-2 rounded-sm border border-forest/30 bg-forest-wash px-3 py-2 text-xs text-forest-deep">
           <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           {state.success}
         </div>

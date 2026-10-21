@@ -52,7 +52,7 @@ export default async function QuizzesPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Priprema"
+        meta="Priprema"
         title="Kvizovi"
         description="Kviz je skup pitanja koja ponavljaš iz odjeljenja u odjeljenje. Test je jedna sesija tog kviza."
         actions={
@@ -65,7 +65,6 @@ export default async function QuizzesPage() {
 
       {activeQuizzes.length === 0 ? (
         <EmptyState
-          icon={BookOpen}
           title="Još nema kvizova"
           description="Napravi prvi kviz — pet pitanja je dovoljno za pet minuta."
         >
@@ -75,8 +74,8 @@ export default async function QuizzesPage() {
           </Link>
         </EmptyState>
       ) : (
-        <div className="card overflow-hidden">
-          <ul className="divide-y divide-line">
+        <div className="sheet overflow-hidden">
+          <ul className="divide-y divide-rule-soft">
             {activeQuizzes.map((quiz) => {
               const questionCount = countFor(quiz.id, questionRows);
               const sessionCount = countFor(quiz.id, sessionRows);
@@ -87,7 +86,7 @@ export default async function QuizzesPage() {
                   key={quiz.id}
                   className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center"
                 >
-                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-soft text-brand">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-sm bg-forest-wash text-forest">
                     <BookOpen className="h-4 w-4" />
                   </span>
 
@@ -95,7 +94,7 @@ export default async function QuizzesPage() {
                     <div className="flex items-center gap-2">
                       <h2 className="truncate text-sm font-semibold">{quiz.title}</h2>
                       {used ? (
-                        <span className="badge border-line bg-paper text-muted">
+                        <span className="badge border-rule bg-paper text-muted">
                           korišten {sessionCount}×
                         </span>
                       ) : null}
@@ -129,7 +128,7 @@ export default async function QuizzesPage() {
                     <ConfirmSubmit
                       action={archiveQuizAction.bind(null, quiz.id)}
                       message={`Arhivirati kviz „${quiz.title}"? Neće se više prikazivati pri otvaranju testa.`}
-                      className="btn btn-ghost !min-h-8 !p-1.5 text-muted hover:text-danger"
+                      className="btn btn-ghost !min-h-8 !p-1.5 text-muted hover:text-pencil"
                       title="Arhiviraj kviz"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
@@ -147,8 +146,8 @@ export default async function QuizzesPage() {
           <summary className="cursor-pointer text-xs font-semibold text-muted">
             Arhivirani kvizovi ({archivedQuizzes.length})
           </summary>
-          <div className="card mt-2 overflow-hidden">
-            <ul className="divide-y divide-line">
+          <div className="sheet mt-2 overflow-hidden">
+            <ul className="divide-y divide-rule-soft">
               {archivedQuizzes.map((quiz) => (
                 <li
                   key={quiz.id}
@@ -160,7 +159,7 @@ export default async function QuizzesPage() {
                   <form action={restoreQuizAction.bind(null, quiz.id)}>
                     <button
                       type="submit"
-                      className="btn btn-ghost !py-1 text-xs text-brand"
+                      className="btn btn-ghost !py-1 text-xs text-forest"
                     >
                       <RotateCcw className="h-3.5 w-3.5" />
                       Vrati

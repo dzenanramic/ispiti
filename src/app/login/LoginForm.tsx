@@ -13,7 +13,7 @@ export function LoginForm() {
       {state.error ? (
         <div
           role="alert"
-          className="flex items-start gap-2 rounded-xl border border-red-200 bg-danger-soft px-3.5 py-2.5 text-sm text-danger"
+          className="border-l-2 border-pencil bg-pencil-wash px-3 py-2 font-sans text-sm text-pencil"
         >
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{state.error}</span>

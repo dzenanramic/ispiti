@@ -1,7 +1,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Download, Percent, Target, Trophy, Users } from "lucide-react";
+import { Download, Percent } from "lucide-react";
 import { db } from "@/db";
 import {
   attempts,
@@ -12,23 +12,15 @@ import {
   students,
   teachers,
 } from "@/db/schema";
-import { PageHeader, EmptyState } from "@/components/ui";
+import { EmptyState, PageHeader, StatRow } from "@/components/ui";
 import { formatDate, percent, pointWord, studentWord, testWord } from "@/lib/format";
 import { requireUser } from "@/lib/guard";
 
 export const metadata = { title: "Uspjeh" };
 
-function successTone(pct: number): string {
-  if (pct >= 80) return "bg-emerald-600";
-  if (pct >= 60) return "bg-brand";
-  if (pct >= 40) return "bg-amber-500";
-  return "bg-danger";
-}
-
+// Jedan ton za uspjeh (bor); crvena olovka samo obilježava ispod 50%.
 function successTextTone(pct: number): string {
-  if (pct >= 60) return "text-brand-dark";
-  if (pct >= 40) return "text-amber-700";
-  return "text-danger";
+  return pct < 50 ? "text-pencil" : "text-forest-deep";
 }
 
 export default async function SuccessPage({
@@ -151,7 +143,7 @@ export default async function SuccessPage({
   return (
     <>
       <PageHeader
-        eyebrow={cls.schoolYear}
+        meta={cls.schoolYear}
         title={cls.name}
         description="Uspjeh učenika po završenim testovima — bodovi se sabiraju, bez ocjena."
         actions={
@@ -162,7 +154,7 @@ export default async function SuccessPage({
         }
       />
 
-      <div className="mb-6 flex gap-1 border-b border-line text-sm">
+      <div className="mb-6 flex gap-1 border-b border-rule text-sm">
         <Link
           href={`/teacher/classes/${cls.id}`}
           data-nav-link="true"
@@ -170,61 +162,44 @@ export default async function SuccessPage({
         >
           Učenici i testovi
         </Link>
-        <span className="border-b-2 border-brand px-3 py-2 font-semibold text-brand">
+        <span className="border-b-2 border-forest px-3 py-2 font-semibold text-forest">
           Uspjeh
         </span>
       </div>
 
-      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="card p-4">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-muted">
-            Testova
-          </p>
-          <p className="mt-1 text-xl font-semibold tabular-nums">
-            {gradedSessions.length}
-            <span className="text-xs font-normal text-muted">
-              {" "}
-              · {totalMax} {pointWord(totalMax)}
-            </span>
-          </p>
-        </div>
-        <div className="card p-4">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-muted">
-            Učenika
-          </p>
-          <p className="mt-1 text-xl font-semibold tabular-nums">
-            {studentRows.length}
-          </p>
-          <p className="mt-0.5 text-xs text-muted">
-            sa rezultatom {withResults.length}
-          </p>
-        </div>
-        <div className="card p-4">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-muted">
-            Prosjek odjeljenja
-          </p>
-          <p className="mt-1 text-xl font-semibold tabular-nums">
-            {classAverage === null ? "—" : `${classAverage}%`}
-          </p>
-        </div>
-      </div>
+      <StatRow
+        items={[
+          {
+            label: "Testova",
+            value: gradedSessions.length,
+            hint: `${totalMax} ${pointWord(totalMax)}`,
+          },
+          {
+            label: "Učenika",
+            value: studentRows.length,
+            hint: `sa rezultatom ${withResults.length}`,
+          },
+          {
+            label: "Prosjek odjeljenja",
+            value: classAverage === null ? "—" : `${classAverage}%`,
+          },
+        ]}
+      />
 
-      <div className="card overflow-hidden">
-        <div className="flex items-center justify-between border-b border-line px-5 py-4">
+      <div className="sheet overflow-hidden">
+        <div className="flex items-center justify-between border-b border-rule px-5 py-4">
           <div>
-            <h2 className="text-sm font-semibold">Uspjeh po testovima</h2>
+            <h2 className="section-title">Uspjeh po testovima</h2>
             <p className="text-xs text-muted">
               {gradedSessions.length} {testWord(gradedSessions.length)} ·{" "}
               {studentRows.length} {studentWord(studentRows.length)}
             </p>
           </div>
-          <Target className="h-4 w-4 text-muted" />
         </div>
 
         {studentRows.length === 0 ? (
           <div className="p-5">
             <EmptyState
-              icon={Users}
               title="Nema učenika na spisku"
               description="Dodaj učenike na stranici odjeljenja, pa se vrati ovdje."
             />
@@ -232,7 +207,6 @@ export default async function SuccessPage({
         ) : gradedSessions.length === 0 ? (
           <div className="p-5">
             <EmptyState
-              icon={Trophy}
               title="Još nema završenih testova"
               description="Kada učenici riješe bar jedan test, ovdje se pojavi njihov uspjeh."
             />
@@ -241,7 +215,7 @@ export default async function SuccessPage({
           <div className="overflow-x-auto">
             <table className="w-full min-w-[36rem] border-collapse text-sm">
               <thead>
-                <tr className="border-b border-line bg-paper/60 text-left text-[11px] uppercase tracking-wide text-muted">
+                <tr className="border-b border-rule bg-paper/60 text-left text-[11px] uppercase tracking-wide text-muted">
                   <th className="sticky left-0 z-10 bg-paper/95 px-4 py-2.5 font-bold">
                     Učenik
                   </th>
@@ -261,8 +235,8 @@ export default async function SuccessPage({
               </thead>
               <tbody>
                 {rows.map(({ student, cells, totalScore, pct }) => (
-                  <tr key={student.id} className="border-b border-line last:border-0">
-                    <td className="sticky left-0 z-10 bg-white px-4 py-3 font-medium">
+                  <tr key={student.id} className="border-b border-rule last:border-0">
+                    <td className="sticky left-0 z-10 bg-lift px-4 py-3 font-medium">
                       <span className="block max-w-[13rem] truncate">
                         {student.name}
                       </span>
@@ -315,13 +289,15 @@ export default async function SuccessPage({
                         <span className="text-xs text-muted">—</span>
                       ) : (
                         <div className="flex items-center gap-2">
-                          <div className="h-1.5 w-24 overflow-hidden rounded-full bg-line">
+                          <div className="h-px w-24 bg-rule">
                             <div
-                              className={`h-full rounded-full ${successTone(pct)}`}
+                              className={pct < 50 ? "h-px bg-pencil" : "h-px bg-forest"}
                               style={{ width: `${pct}%` }}
                             />
                           </div>
-                          <span className="w-9 text-right text-xs font-semibold tabular-nums">
+                          <span
+                            className={`w-9 text-right font-data text-xs ${pct < 50 ? "text-pencil" : "text-ink-soft"}`}
+                          >
                             {pct}%
                           </span>
                         </div>

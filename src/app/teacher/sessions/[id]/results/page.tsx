@@ -13,7 +13,7 @@ import {
   students,
 } from "@/db/schema";
 import { PrintButton } from "@/components/PrintButton";
-import { Banner, PageHeader, StatusBadge } from "@/components/ui";
+import { Banner, PageHeader, StatRow } from "@/components/ui";
 import { formatDateTime, percent, pointWord } from "@/lib/format";
 import { requireUser } from "@/lib/guard";
 
@@ -139,7 +139,7 @@ export default async function ResultsPage({
       </Link>
 
       <PageHeader
-        eyebrow={`${session.className} · ${formatDateTime(session.startedAt ?? session.createdAt)}`}
+        meta={`${session.className} · ${formatDateTime(session.startedAt ?? session.createdAt)}`}
         title={`Rezultati · ${session.quizTitle}`}
         description={`${submitted.length} od ${studentRows.length} učenika je predalo · maksimum ${maxPoints} ${pointWord(maxPoints)}`}
         actions={
@@ -171,48 +171,17 @@ export default async function ResultsPage({
         </div>
       ) : null}
 
-      <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="card p-4">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-muted">
-            Predalo
-          </p>
-          <p className="mt-1 text-xl font-semibold tabular-nums">
-            {submitted.length}
-            <span className="text-xs font-normal text-muted">
-              /{studentRows.length}
-            </span>
-          </p>
-        </div>
-        <div className="card p-4">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-muted">
-            Prosjek
-          </p>
-          <p className="mt-1 text-xl font-semibold tabular-nums">
-            {average.toFixed(1)}
-            <span className="text-xs font-normal text-muted">/{maxPoints}</span>
-          </p>
-        </div>
-        <div className="card p-4">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-muted">
-            Prosjek %
-          </p>
-          <p className="mt-1 text-xl font-semibold tabular-nums">
-            {percent(average, maxPoints)}%
-          </p>
-        </div>
-        <div className="card p-4">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-muted">
-            Status
-          </p>
-          <div className="mt-1.5">
-            <StatusBadge status={session.status} />
-          </div>
-        </div>
-      </div>
+      <StatRow
+        items={[
+          { label: "Predalo", value: `${submitted.length}/${studentRows.length}` },
+          { label: "Prosjek", value: `${average.toFixed(1)}/${maxPoints}` },
+          { label: "Prosjek %", value: `${percent(average, maxPoints)}%` },
+        ]}
+      />
 
-      <div className="card overflow-hidden">
-        <div className="border-b border-line px-5 py-4">
-          <h2 className="text-sm font-semibold">Matrica odgovora</h2>
+      <div className="sheet overflow-hidden">
+        <div className="border-b border-rule px-5 py-4">
+          <h2 className="section-title">Matrica odgovora</h2>
           <p className="text-xs text-muted">
             Zeleno = tačno, crveno = netačno. Pređi mišem preko slova za pun
             odgovor.
@@ -222,7 +191,7 @@ export default async function ResultsPage({
         <div className="overflow-x-auto">
           <table className="w-full min-w-[40rem] border-collapse text-sm">
             <thead>
-              <tr className="border-b border-line bg-paper/60 text-[10px] uppercase tracking-wide text-muted">
+              <tr className="border-b border-rule bg-paper/60 text-[10px] uppercase tracking-wide text-muted">
                 <th className="sticky left-0 z-10 bg-paper/95 px-4 py-2.5 text-left font-bold">
                   Učenik
                 </th>
@@ -249,15 +218,15 @@ export default async function ResultsPage({
                   : [];
 
                 return (
-                  <tr key={student.id} className="border-b border-line last:border-0">
-                    <td className="sticky left-0 z-10 bg-white px-4 py-2.5 font-medium">
+                  <tr key={student.id} className="border-b border-rule last:border-0">
+                    <td className="sticky left-0 z-10 bg-lift px-4 py-2.5 font-medium">
                       <span className="block max-w-[13rem] truncate">
                         {student.name}
                       </span>
                       {!attempt ? (
                         <span className="text-[10px] font-normal text-muted">nije pristupio</span>
                       ) : attempt.status !== "submitted" ? (
-                        <span className="text-[10px] font-normal text-amber-700">u toku</span>
+                        <span className="text-[10px] font-normal text-ink-soft">u toku</span>
                       ) : studentAnswers.length === 0 && attempt.score > 0 ? (
                         <span className="text-[10px] font-normal text-muted">ručno upisano</span>
                       ) : null}
@@ -284,8 +253,8 @@ export default async function ResultsPage({
                           <span
                             className={
                               answer.isCorrect
-                                ? "inline-flex h-7 min-w-7 items-center justify-center rounded-md bg-brand-soft px-1.5 text-xs font-bold text-brand-dark"
-                                : "inline-flex h-7 min-w-7 items-center justify-center rounded-md bg-danger-soft px-1.5 text-xs font-bold text-danger"
+                                ? "inline-flex h-7 min-w-7 items-center justify-center rounded-xs bg-forest-wash px-1.5 text-xs font-bold text-forest-deep"
+                                : "inline-flex h-7 min-w-7 items-center justify-center rounded-xs bg-pencil-wash px-1.5 text-xs font-bold text-pencil"
                             }
                             title={`${answerTitle(question, answer.value)}${
                               answer.isCorrect ? " · tačno" : " · netačno"
@@ -317,14 +286,14 @@ export default async function ResultsPage({
               })}
             </tbody>
             <tfoot>
-              <tr className="border-t-2 border-line bg-paper/70 text-xs">
+              <tr className="border-t-2 border-rule bg-paper/70 text-xs">
                 <td className="sticky left-0 z-10 bg-paper px-4 py-2.5 font-bold">
                   Tačan odgovor
                 </td>
                 {questionRows.map((question) => (
                   <td key={question.id} className="px-1.5 py-2.5 text-center">
                     <span
-                      className="inline-flex items-center gap-0.5 font-bold text-brand-dark"
+                      className="inline-flex items-center gap-0.5 font-bold text-forest-deep"
                       title={answerTitle(question, question.correct)}
                     >
                       {question.type === "tf" ? null : (
@@ -344,14 +313,14 @@ export default async function ResultsPage({
         </div>
       </div>
 
-      <section className="card mt-5 overflow-hidden">
-        <div className="border-b border-line px-5 py-4">
-          <h2 className="text-sm font-semibold">Uspješnost po pitanju</h2>
+      <section className="sheet mt-5 overflow-hidden">
+        <div className="border-b border-rule px-5 py-4">
+          <h2 className="section-title">Uspješnost po pitanju</h2>
           <p className="text-xs text-muted">
             Korisno za osvrt na početku sljedećeg časa.
           </p>
         </div>
-        <ul className="divide-y divide-line">
+        <ul className="divide-y divide-rule-soft">
           {questionRows.map((question, index) => {
             const questionAnswers = answerRows.filter(
               (answer) => answer.questionId === question.id,
@@ -367,7 +336,7 @@ export default async function ResultsPage({
             return (
               <li key={question.id} className="px-5 py-3.5">
                 <div className="flex items-start gap-3">
-                  <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md bg-paper text-[10px] font-bold text-muted">
+                  <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-xs bg-paper text-[10px] font-bold text-muted">
                     {index + 1}
                   </span>
                   <div className="min-w-0 flex-1">
@@ -379,29 +348,27 @@ export default async function ResultsPage({
                       {question.prompt}
                     </p>
                     <div className="mt-2 flex items-center gap-3">
-                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-line">
+                      <div className="h-px flex-1 bg-rule">
                         <div
-                          className={
-                            pct >= 60 ? "h-full bg-brand" : "h-full bg-danger"
-                          }
+                          className={pct >= 60 ? "h-px bg-forest" : "h-px bg-pencil"}
                           style={{ width: `${pct}%` }}
                         />
                       </div>
-                      <span className="w-16 text-right text-xs tabular-nums text-muted">
+                      <span className="w-16 text-right font-data text-xs text-muted">
                         {correctCount}/{questionAnswers.length} · {pct}%
                       </span>
                     </div>
                   </div>
                   {question.type === "tf" ? (
-                    <span className="badge border-line bg-paper text-muted">
+                    <span className="badge border-rule bg-paper text-muted">
                       T/N
                     </span>
                   ) : question.type === "cloze" ? (
-                    <span className="badge border-line bg-paper text-muted">
+                    <span className="badge border-rule bg-paper text-muted">
                       dopuna
                     </span>
                   ) : (
-                    <span className="badge border-line bg-paper text-muted">
+                    <span className="badge border-rule bg-paper text-muted">
                       odgovor
                     </span>
                   )}

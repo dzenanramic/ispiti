@@ -3,7 +3,6 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import {
   ArrowRight,
-  BookOpen,
   CalendarClock,
   Plus,
   Trophy,
@@ -99,7 +98,7 @@ export default async function ClassPage({
   return (
     <>
       <PageHeader
-        eyebrow={cls.schoolYear}
+        meta={cls.schoolYear}
         title={cls.name}
         description={
           user.role === "admin"
@@ -128,8 +127,8 @@ export default async function ClassPage({
         }
       />
 
-      <div className="mb-6 flex gap-1 border-b border-line text-sm">
-        <span className="border-b-2 border-brand px-3 py-2 font-semibold text-brand">
+      <div className="mb-6 flex gap-1 border-b border-rule text-sm">
+        <span className="border-b-2 border-forest px-3 py-2 font-semibold text-forest">
           Učenici i testovi
         </span>
         <Link
@@ -142,10 +141,10 @@ export default async function ClassPage({
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
-        <section className="card overflow-hidden">
-          <div className="flex items-center justify-between border-b border-line px-5 py-4">
+        <section className="sheet overflow-hidden">
+          <div className="flex items-center justify-between border-b border-rule px-5 py-4">
             <div>
-              <h2 className="text-sm font-semibold">Spisak učenika</h2>
+              <h2 className="section-title">Spisak učenika</h2>
               <p className="text-xs text-muted">
                 {activeStudents.length} aktivnih
                 {inactiveStudents.length > 0
@@ -162,7 +161,7 @@ export default async function ClassPage({
                 Spisak je prazan. Zalijepi imena ispod.
               </div>
             ) : (
-              <ul className="divide-y divide-line">
+              <ul className="divide-y divide-rule-soft">
                 {activeStudents.map((student, index) => (
                   <li
                     key={student.id}
@@ -175,7 +174,7 @@ export default async function ClassPage({
                     <ConfirmSubmit
                       action={deactivateStudentAction.bind(null, student.id)}
                       message={`Deaktivirati ${student.name}? Historija testova ostaje sačuvana.`}
-                      className="btn btn-ghost !min-h-8 !p-1.5 text-muted hover:text-danger"
+                      className="btn btn-ghost !min-h-8 !p-1.5 text-muted hover:text-pencil"
                       title="Deaktiviraj učenika"
                     >
                       <UserMinus className="h-3.5 w-3.5" />
@@ -188,7 +187,7 @@ export default async function ClassPage({
 
           <form
             action={addStudentsAction.bind(null, cls.id)}
-            className="border-t border-line bg-paper/50 p-4"
+            className="border-t border-rule bg-paper/50 p-4"
           >
             <label htmlFor="names" className="label">
               Dodaj učenike
@@ -212,7 +211,7 @@ export default async function ClassPage({
           </form>
 
           {inactiveStudents.length > 0 ? (
-            <details className="border-t border-line px-4 py-3">
+            <details className="border-t border-rule px-4 py-3">
               <summary className="cursor-pointer text-xs font-semibold text-muted">
                 Neaktivni učenici ({inactiveStudents.length})
               </summary>
@@ -224,7 +223,7 @@ export default async function ClassPage({
                   >
                     <span className="truncate">{student.name}</span>
                     <form action={activateStudentAction.bind(null, student.id)}>
-                      <button type="submit" className="font-semibold text-brand hover:underline">
+                      <button type="submit" className="font-semibold text-forest hover:underline">
                         Vrati
                       </button>
                     </form>
@@ -235,9 +234,9 @@ export default async function ClassPage({
           ) : null}
         </section>
 
-        <section className="card overflow-hidden">
-          <div className="border-b border-line px-5 py-4">
-            <h2 className="text-sm font-semibold">Testovi ovog odjeljenja</h2>
+        <section className="sheet overflow-hidden">
+          <div className="border-b border-rule px-5 py-4">
+            <h2 className="section-title">Testovi ovog odjeljenja</h2>
             <p className="text-xs text-muted">
               Pet minuta po testu · bodovi se sabiraju u pregledu uspjeha.
             </p>
@@ -246,7 +245,6 @@ export default async function ClassPage({
           {quizRows.length === 0 ? (
             <div className="p-5">
               <EmptyState
-                icon={BookOpen}
                 title="Nema spremnih kvizova"
                 description="Napravi kviz, pa se vrati ovdje da pokreneš test."
               >
@@ -263,7 +261,7 @@ export default async function ClassPage({
           ) : (
             <form
               action={createSessionAction}
-              className="border-b border-line bg-paper/50 p-4"
+              className="border-b border-rule bg-paper/50 p-4"
             >
               <input type="hidden" name="classId" value={cls.id} />
               <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_7.5rem]">
@@ -306,7 +304,7 @@ export default async function ClassPage({
           {sessionRows.length === 0 ? (
             <div className="p-5 text-sm text-muted">Još nema održanih testova.</div>
           ) : (
-            <ul className="divide-y divide-line">
+            <ul className="divide-y divide-rule-soft">
               {sessionRows.map((session) => {
                 const sessionAttempts = attemptRows.filter(
                   (attempt) => attempt.sessionId === session.id,

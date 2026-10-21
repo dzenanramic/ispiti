@@ -1,15 +1,24 @@
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
+import { Cormorant_Garamond, Arimo } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+const serif = Cormorant_Garamond({
+  variable: "--font-cormorant",
+  subsets: ["latin", "latin-ext"],
+  weight: ["400", "500", "600", "700"],
+  style: ["normal", "italic"],
+  display: "swap",
+});
+
+const sans = Arimo({
+  variable: "--font-arimo",
+  subsets: ["latin", "latin-ext"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
   title: {
-    default: "Ispiti — brzi test za početak časa",
+    default: "Ispiti — pet minuta na početku časa",
     template: "%s · Ispiti",
   },
   description:
@@ -24,7 +33,7 @@ export default function RootLayout({
     <html
       lang="bs"
       data-scroll-behavior="smooth"
-      className={`${geistSans.variable} h-full`}
+      className={`${serif.variable} ${sans.variable} h-full`}
     >
       <body className="min-h-full">{children}</body>
     </html>

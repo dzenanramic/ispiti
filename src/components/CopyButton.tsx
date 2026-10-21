@@ -27,7 +27,7 @@ export function CopyButton({
   return (
     <button type="button" onClick={copy} className={className}>
       {copied ? (
-        <Check className="h-4 w-4 text-emerald-600" />
+        <Check className="h-4 w-4 text-forest" />
       ) : (
         <Copy className="h-4 w-4" />
       )}

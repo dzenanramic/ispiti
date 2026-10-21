@@ -593,15 +593,15 @@ export function StudentApp({ code }: { code: string }) {
 
   return (
     <div className="flex min-h-dvh flex-col bg-paper">
-      <header className="border-b border-line bg-white/70">
+      <header className="border-b border-rule bg-lift/70">
         <div className="mx-auto flex w-full max-w-lg items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2">
-            <span className="grid h-7 w-7 place-items-center rounded-lg bg-brand text-white">
+            <span className="grid h-7 w-7 place-items-center rounded-xs bg-forest text-paper">
               <UserRound className="h-3.5 w-3.5" />
             </span>
             <span className="text-sm font-semibold tracking-tight">Ispiti</span>
           </div>
-          <span className="font-mono text-[11px] font-bold tracking-[0.2em] text-muted">
+          <span className="font-data text-xs tracking-[0.16em] text-muted">
             {code}
           </span>
         </div>
@@ -617,7 +617,7 @@ export function StudentApp({ code }: { code: string }) {
 
         {phase === "error" ? (
           <div className="card p-6 text-center">
-            <AlertCircle className="mx-auto h-8 w-8 text-danger" />
+            <AlertCircle className="mx-auto h-8 w-8 text-pencil" />
             <h1 className="mt-3 text-lg font-semibold">Test nije dostupan</h1>
             <p className="mt-1.5 text-sm text-muted">
               {error ?? "Provjeri kod kod nastavnika."}
@@ -650,7 +650,7 @@ export function StudentApp({ code }: { code: string }) {
 
         {phase === "submitted" ? (
           <div className="card p-8 text-center">
-            <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-brand-soft text-brand">
+            <span className="mx-auto grid h-14 w-14 place-items-center rounded-none bg-forest-wash text-forest">
               <CheckCircle2 className="h-7 w-7" />
             </span>
             <h1 className="mt-4 text-xl font-semibold">Test je predan</h1>
@@ -668,7 +668,7 @@ export function StudentApp({ code }: { code: string }) {
         {phase === "pick" && join ? (
           <div>
             <div className="text-center">
-              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-brand">
+              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-forest">
                 {join.session.className}
               </p>
               <h1 className="mt-1 text-xl font-semibold tracking-tight">
@@ -678,14 +678,14 @@ export function StudentApp({ code }: { code: string }) {
             </div>
 
             {join.session.status === "active" ? (
-              <div className="mt-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-soft px-3 py-2 text-xs text-amber-900">
+              <div className="mt-4 flex items-start gap-2 rounded-sm border border-rule bg-amber-soft px-3 py-2 text-xs text-ink-soft">
                 <Timer className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 Test je već počeo — pridruži se odmah, vrijeme ide.
               </div>
             ) : null}
 
             {error ? (
-              <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-200 bg-danger-soft px-3 py-2 text-xs text-danger">
+              <div className="mt-4 flex items-start gap-2 rounded-sm border border-pencil/40 bg-pencil-wash px-3 py-2 text-xs text-pencil">
                 <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 {error}
               </div>
@@ -712,10 +712,10 @@ export function StudentApp({ code }: { code: string }) {
                   disabled={student.taken || claiming}
                   onClick={() => setSelected(student)}
                   className={clsx(
-                    "flex min-h-11 items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left text-sm transition-colors",
+                    "flex min-h-11 items-center justify-between gap-2 rounded-sm border px-3 py-2.5 text-left text-sm transition-colors",
                     student.taken
-                      ? "cursor-not-allowed border-line bg-paper text-muted opacity-70"
-                      : "border-line bg-white font-medium hover:border-brand/40 hover:bg-brand-soft/30",
+                      ? "cursor-not-allowed border-rule bg-paper text-muted opacity-70"
+                      : "border-rule bg-lift font-medium hover:border-forest/40 hover:bg-forest-wash/30",
                   )}
                 >
                   <span className="min-w-0 truncate">{student.name}</span>
@@ -746,8 +746,8 @@ export function StudentApp({ code }: { code: string }) {
         {phase === "lobby" ? (
           <div className="card p-8 text-center">
             <span className="relative mx-auto flex h-14 w-14 items-center justify-center">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-soft" />
-              <span className="relative grid h-14 w-14 place-items-center rounded-full bg-brand-soft text-brand">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-none bg-forest-wash" />
+              <span className="relative grid h-14 w-14 place-items-center rounded-none bg-forest-wash text-forest">
                 <Timer className="h-6 w-6" />
               </span>
             </span>
@@ -755,7 +755,7 @@ export function StudentApp({ code }: { code: string }) {
             <p className="mt-2 text-sm leading-relaxed text-muted">
               Nastavnik će pokrenuti test. Tajmer kreće za sve u isto vrijeme.
             </p>
-            <div className="mt-5 rounded-xl border border-line bg-paper/60 px-3 py-2.5">
+            <div className="mt-5 rounded-sm border border-rule bg-paper/60 px-3 py-2.5">
               <p className="text-[10px] font-bold uppercase tracking-wide text-muted">
                 Prijavljen kao
               </p>
@@ -767,14 +767,14 @@ export function StudentApp({ code }: { code: string }) {
               Ne zatvaraj stranicu. Kada test počne, pitanja se pojavljuju sama.
             </p>
             {error ? (
-              <p className="mt-3 text-[11px] text-danger">{error}</p>
+              <p className="mt-3 text-[11px] text-pencil">{error}</p>
             ) : null}
           </div>
         ) : null}
 
         {phase === "active" ? (
           <div className="-mx-4 -my-5 flex flex-1 flex-col">
-            <div className="sticky top-0 z-20 border-b border-line bg-paper/95 px-4 pb-2 pt-3 backdrop-blur">
+            <div className="sticky top-0 z-20 border-b border-rule bg-paper/95 px-4 pb-2 pt-3 backdrop-blur">
               <div className="mx-auto flex w-full max-w-lg items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="truncate text-[11px] font-medium text-muted">
@@ -786,12 +786,12 @@ export function StudentApp({ code }: { code: string }) {
                 </div>
                 <div
                   className={clsx(
-                    "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 font-mono text-sm font-bold tabular-nums",
+                    "flex shrink-0 items-center gap-1.5 border px-2.5 py-1 font-data text-sm font-semibold tabular-nums",
                     remainingSeconds !== null && remainingSeconds <= 15
-                      ? "border-red-200 bg-danger-soft text-danger"
+                      ? "border-pencil/40 bg-pencil-wash text-pencil"
                       : remainingSeconds !== null && remainingSeconds <= 60
-                        ? "border-amber-200 bg-amber-soft text-amber-900"
-                        : "border-line bg-white text-ink",
+                        ? "border-rule bg-amber-soft text-ink-soft"
+                        : "border-rule bg-lift text-ink",
                   )}
                 >
                   <Clock className="h-3.5 w-3.5" />
@@ -800,9 +800,9 @@ export function StudentApp({ code }: { code: string }) {
                     : "—"}
                 </div>
               </div>
-              <div className="mx-auto mt-2 h-1 w-full max-w-lg overflow-hidden rounded-full bg-line">
+              <div className="mx-auto mt-2 h-1 w-full max-w-lg overflow-hidden rounded-none bg-rule">
                 <div
-                  className="h-full rounded-full bg-brand transition-all duration-300"
+                  className="h-full rounded-none bg-forest transition-all duration-300"
                   style={{
                     width: `${questions.length > 0 ? Math.round((answeredCount / questions.length) * 100) : 0}%`,
                   }}
@@ -812,7 +812,7 @@ export function StudentApp({ code }: { code: string }) {
 
             <div className="mx-auto w-full max-w-lg flex-1 px-4 py-4">
               {error ? (
-                <div className="mb-3 flex items-start gap-2 rounded-xl border border-red-200 bg-danger-soft px-3 py-2 text-xs text-danger">
+                <div className="mb-3 flex items-start gap-2 rounded-sm border border-pencil/40 bg-pencil-wash px-3 py-2 text-xs text-pencil">
                   <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                   {error}
                 </div>
@@ -830,7 +830,7 @@ export function StudentApp({ code }: { code: string }) {
                         <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted">
                           Pitanje {index + 1} od {questions.length}
                         </span>
-                        <span className="badge border-line bg-paper text-muted">
+                        <span className="badge border-rule bg-paper text-muted">
                           {typeLabel(question.type)}
                         </span>
                       </div>
@@ -848,8 +848,8 @@ export function StudentApp({ code }: { code: string }) {
                             className={clsx(
                               "mx-1 inline-flex min-w-20 items-center justify-center rounded-md border-b-2 px-2 py-0.5 align-baseline text-sm font-semibold",
                               value !== undefined
-                                ? "border-brand bg-brand-soft text-brand-dark"
-                                : "border-line bg-paper text-muted",
+                                ? "border-forest bg-forest-wash text-forest-deep"
+                                : "border-rule bg-paper text-muted",
                             )}
                           >
                             {value !== undefined
@@ -884,13 +884,13 @@ export function StudentApp({ code }: { code: string }) {
                                   type="button"
                                   onClick={() => saveAnswer(question, option.value)}
                                   className={clsx(
-                                    "flex min-h-11 items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-semibold transition-colors",
+                                    "flex min-h-11 items-center justify-center gap-2 rounded-sm border px-3 py-2.5 text-sm font-semibold transition-colors",
                                     active
-                                      ? "border-brand bg-brand text-white"
-                                      : "border-line bg-white text-ink hover:border-brand/40",
+                                      ? "border-forest bg-forest-wash text-forest-deep"
+                                      : "border-rule bg-lift text-ink hover:border-forest/60",
                                   )}
                                 >
-                                  {active ? <Check className="h-4 w-4" /> : null}
+                                  {active ? "•" : null}
                                   {option.label}
                                 </button>
                               );
@@ -914,34 +914,34 @@ export function StudentApp({ code }: { code: string }) {
                                   dir="auto"
                                   onClick={() => saveAnswer(question, optionIndex)}
                                   className={clsx(
-                                    "flex min-h-11 items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left text-sm transition-colors",
+                                    "flex min-h-11 items-center gap-2.5 rounded-sm border px-3 py-2.5 text-left text-sm transition-colors",
                                     active
-                                      ? "border-brand bg-brand-soft font-semibold text-brand-dark"
-                                      : "border-line bg-white hover:border-brand/40",
+                                      ? "border-forest bg-forest-wash font-semibold text-forest-deep"
+                                      : "border-rule bg-lift hover:border-forest/40",
                                     isArabic(option) && "font-arabic text-[16px]",
                                   )}
                                 >
                                   {question.type === "single" ? (
                                     <span
                                       className={clsx(
-                                        "grid h-6 w-6 shrink-0 place-items-center rounded-md text-[11px] font-bold",
+                                        "grid h-6 w-6 shrink-0 place-items-center border font-data text-[11px]",
                                         active
-                                          ? "bg-brand text-white"
-                                          : "bg-paper text-muted",
+                                          ? "border-forest bg-forest text-paper"
+                                          : "border-rule-soft bg-paper text-muted",
                                       )}
                                     >
-                                      {String.fromCharCode(65 + optionIndex)}
+                                      {String.fromCharCode(65 + optionIndex)}.
                                     </span>
                                   ) : (
                                     <span
                                       className={clsx(
-                                        "grid h-5 w-5 shrink-0 place-items-center rounded-full border",
+                                        "grid h-5 w-5 shrink-0 place-items-center rounded-none border",
                                         active
-                                          ? "border-brand bg-brand text-white"
-                                          : "border-line",
+                                          ? "border-forest bg-forest-wash text-forest-deep"
+                                          : "border-rule",
                                       )}
                                     >
-                                      {active ? <Check className="h-3 w-3" /> : null}
+                                      {active ? "•" : null}
                                     </span>
                                   )}
                                   <span className="min-w-0 flex-1">{option}</span>
@@ -964,11 +964,11 @@ export function StudentApp({ code }: { code: string }) {
                     </>
                   ) : saveState === "saved" ? (
                     <>
-                      <Check className="h-3 w-3 text-brand" /> Sačuvano
+                      <Check className="h-3 w-3 text-forest" /> Sačuvano
                     </>
                   ) : saveState === "error" ? (
                     <>
-                      <WifiOff className="h-3 w-3 text-danger" /> Nije sačuvano
+                      <WifiOff className="h-3 w-3 text-pencil" /> Nije sačuvano
                     </>
                   ) : (
                     <>
@@ -980,7 +980,7 @@ export function StudentApp({ code }: { code: string }) {
                   <button
                     type="button"
                     onClick={() => void retrySaves()}
-                    className="inline-flex items-center gap-1 font-semibold text-brand"
+                    className="inline-flex items-center gap-1 font-semibold text-forest"
                   >
                     <RotateCw className="h-3 w-3" /> Pokušaj ponovo
                   </button>
@@ -988,7 +988,7 @@ export function StudentApp({ code }: { code: string }) {
               </div>
             </div>
 
-            <div className="sticky bottom-0 border-t border-line bg-paper/95 px-4 py-3 backdrop-blur safe-bottom">
+            <div className="sticky bottom-0 border-t border-rule bg-paper/95 px-4 py-3 backdrop-blur safe-bottom">
               <div className="mx-auto flex w-full max-w-lg items-center gap-3">
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-semibold">
@@ -1029,7 +1029,7 @@ export function StudentApp({ code }: { code: string }) {
             role="dialog"
             aria-modal="true"
             aria-labelledby="confirm-name"
-            className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
+            className="w-full max-w-sm rounded-sm bg-lift p-5 shadow-xl"
           >
             <p id="confirm-name" className="text-sm text-muted">
               Prijavljuješ se kao

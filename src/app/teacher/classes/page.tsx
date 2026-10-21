@@ -52,7 +52,7 @@ export default async function ClassesPage({
   return (
     <>
       <PageHeader
-        eyebrow="Nastava"
+        meta="Nastava"
         title="Odjeljenja"
         description="Svako odjeljenje ima spisak učenika, svoje testove i pregled uspjeha."
       />
@@ -65,7 +65,7 @@ export default async function ClassesPage({
 
       <form
         action={createClassAction}
-        className="card mb-6 flex flex-col gap-3 p-4 sm:flex-row sm:items-end"
+        className="sheet mb-6 flex flex-col gap-3 p-4 sm:flex-row sm:items-end"
       >
         <div className="flex-1">
           <label htmlFor="name" className="label">
@@ -88,7 +88,6 @@ export default async function ClassesPage({
 
       {classRows.length === 0 ? (
         <EmptyState
-          icon={Users}
           title="Još nema odjeljenja"
           description="Dodaj prvo odjeljenje iznad, pa zalijepi spisak učenika."
         />
@@ -112,7 +111,7 @@ export default async function ClassesPage({
                 key={cls.id}
                 href={`/teacher/classes/${cls.id}`}
                 data-nav-link="true"
-                className="card group flex flex-col p-5 transition-shadow hover:shadow-md"
+                className="sheet group flex flex-col p-5 transition-shadow hover:shadow-md"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -127,8 +126,8 @@ export default async function ClassesPage({
                     ) : null}
                   </div>
                   {activeTest ? (
-                    <span className="badge border-emerald-200 bg-brand-soft text-brand-dark">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    <span className="badge border-forest/30 bg-forest-wash text-forest-deep">
+                      <span className="h-1.5 w-1.5 rounded-full bg-forest" />
                       aktivan test
                     </span>
                   ) : (

@@ -7,7 +7,6 @@ import {
   AlertCircle,
   ArrowDown,
   ArrowUp,
-  Check,
   FileText,
   Loader2,
   Plus,
@@ -301,7 +300,7 @@ export function QuizEditor({ initial }: { initial: InitialQuiz | null }) {
       </div>
 
       {initial?.locked ? (
-        <div className="mb-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-soft px-3.5 py-2.5 text-sm text-amber-900">
+        <div className="mb-4 flex items-start gap-2 rounded-sm border border-rule bg-amber-soft px-3.5 py-2.5 text-sm text-ink-soft">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>
             Ovaj kviz je već korišten u testu. Izmjene nisu dozvoljene da bi
@@ -313,7 +312,7 @@ export function QuizEditor({ initial }: { initial: InitialQuiz | null }) {
       {error ? (
         <div
           role="alert"
-          className="mb-4 flex items-start gap-2 rounded-xl border border-red-200 bg-danger-soft px-3.5 py-2.5 text-sm text-danger"
+          className="mb-4 flex items-start gap-2 rounded-sm border border-pencil/40 bg-pencil-wash px-3.5 py-2.5 text-sm text-pencil"
         >
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{error}</span>
@@ -374,10 +373,10 @@ export function QuizEditor({ initial }: { initial: InitialQuiz | null }) {
       </div>
 
       {importOpen ? (
-        <div className="card mb-5 border-brand/20 bg-brand-soft/30 p-4">
+        <div className="card mb-5 border-forest/20 bg-forest-wash/30 p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-sm font-semibold">Uvoz pitanja iz teksta</h2>
+              <h2 className="section-title">Uvoz pitanja iz teksta</h2>
               <p className="mt-0.5 text-xs text-muted">
                 Zalijepi pitanja u šablonu ispod. Prazan red razdvaja pitanja.
               </p>
@@ -392,7 +391,7 @@ export function QuizEditor({ initial }: { initial: InitialQuiz | null }) {
             </button>
           </div>
 
-          <pre className="mt-3 overflow-x-auto rounded-xl border border-line bg-white p-3 text-[11px] leading-relaxed text-muted">
+          <pre className="mt-3 overflow-x-auto rounded-sm border border-rule bg-lift p-3 text-[11px] leading-relaxed text-muted">
 {`1. Koji su osnovni dijelovi hadisa?
 A) Isnad i matn
 B) Sened i šerh
@@ -417,14 +416,14 @@ Tačno: isnad`}
           />
 
           {importErrors.length > 0 ? (
-            <ul className="mt-2 space-y-1 text-xs text-danger">
+            <ul className="mt-2 space-y-1 text-xs text-pencil">
               {importErrors.map((issue) => (
                 <li key={issue}>• {issue}</li>
               ))}
             </ul>
           ) : null}
           {importedCount !== null && importErrors.length === 0 ? (
-            <p className="mt-2 text-xs font-medium text-brand">
+            <p className="mt-2 text-xs font-medium text-forest">
               Uvezeno pitanja: {importedCount}.
             </p>
           ) : null}
@@ -454,7 +453,7 @@ Tačno: isnad`}
         {questions.map((question, index) => (
           <div key={question.key} className="card p-4 sm:p-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="grid h-7 w-7 place-items-center rounded-lg bg-brand-soft text-xs font-bold text-brand-dark">
+              <span className="grid h-7 w-7 place-items-center rounded-xs bg-forest-wash text-xs font-bold text-forest-deep">
                 {index + 1}
               </span>
 
@@ -464,7 +463,7 @@ Tačno: isnad`}
                   onChange={(event) =>
                     changeType(index, event.target.value as QuestionType)
                   }
-                  className="select !w-auto !py-1.5 text-xs"
+                  className="select !w-auto !py-1.5 text-xs !pr-7"
                   aria-label={`Tip pitanja ${index + 1}`}
                 >
                   {(Object.keys(TYPE_LABELS) as QuestionType[]).map((type) => (
@@ -496,7 +495,7 @@ Tačno: isnad`}
                   type="button"
                   onClick={() => removeQuestion(index)}
                   disabled={questions.length === 1}
-                  className="btn btn-ghost !min-h-8 !p-1.5 hover:text-danger"
+                  className="btn btn-ghost !min-h-8 !p-1.5 hover:text-pencil"
                   aria-label="Obriši pitanje"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
@@ -529,10 +528,10 @@ Tačno: isnad`}
                       updateQuestion(index, { ...question, correct: value })
                     }
                     className={clsx(
-                      "flex-1 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors",
+                      "flex-1 rounded-sm border px-4 py-2.5 text-sm font-semibold transition-colors",
                       question.correct === value
-                        ? "border-brand bg-brand-soft text-brand-dark"
-                        : "border-line bg-white text-muted hover:border-brand/30",
+                        ? "border-forest bg-forest-wash text-forest-deep"
+                        : "border-rule bg-lift text-muted hover:border-forest/30",
                     )}
                   >
                     {value ? "Tačno" : "Netačno"}
@@ -555,19 +554,15 @@ Tačno: isnad`}
                           type="button"
                           onClick={() => updateQuestion(index, withCorrect(question, optionIndex))}
                           className={clsx(
-                            "grid h-8 w-8 shrink-0 place-items-center rounded-lg border text-xs font-bold transition-colors",
+                            "grid h-8 w-8 shrink-0 place-items-center border font-data text-xs transition-colors",
                             selected
-                              ? "border-brand bg-brand text-white"
-                              : "border-line bg-white text-muted hover:border-brand/40",
+                              ? "border-forest bg-forest text-paper"
+                              : "border-rule bg-lift text-muted hover:border-forest/50",
                           )}
                           aria-label={`Označi ${LETTERS[optionIndex]} kao tačan odgovor`}
                           aria-pressed={selected}
                         >
-                          {selected ? (
-                            <Check className="h-4 w-4" />
-                          ) : (
-                            LETTERS[optionIndex]
-                          )}
+                          {selected ? "•" : LETTERS[optionIndex]}
                         </button>
                         <input
                           value={option}
@@ -586,7 +581,7 @@ Tačno: isnad`}
                           type="button"
                           onClick={() => removeOption(index, optionIndex)}
                           disabled={question.options.length <= 2}
-                          className="btn btn-ghost !min-h-8 !p-1.5 hover:text-danger"
+                          className="btn btn-ghost !min-h-8 !p-1.5 hover:text-pencil"
                           aria-label="Obriši opciju"
                         >
                           <X className="h-3.5 w-3.5" />
@@ -599,7 +594,7 @@ Tačno: isnad`}
                   <button
                     type="button"
                     onClick={() => addOption(index)}
-                    className="mt-2 text-xs font-semibold text-brand hover:text-brand-dark"
+                    className="mt-2 text-xs font-semibold text-forest hover:text-forest-deep"
                   >
                     + Dodaj opciju
                   </button>

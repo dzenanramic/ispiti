@@ -14,13 +14,13 @@ export function ChangePasswordForm() {
   return (
     <form action={formAction} className="space-y-4">
       {state.error ? (
-        <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-danger-soft px-3.5 py-2.5 text-sm text-danger">
+        <div className="flex items-start gap-2 rounded-sm border border-pencil/40 bg-pencil-wash px-3.5 py-2.5 text-sm text-pencil">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           {state.error}
         </div>
       ) : null}
       {state.success ? (
-        <div className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-brand-soft px-3.5 py-2.5 text-sm text-brand-dark">
+        <div className="flex items-start gap-2 rounded-sm border border-forest/30 bg-forest-wash px-3.5 py-2.5 text-sm text-forest-deep">
           <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
           {state.success}
         </div>

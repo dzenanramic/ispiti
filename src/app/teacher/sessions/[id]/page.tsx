@@ -141,7 +141,7 @@ export default async function SessionPage({
       </Link>
 
       <PageHeader
-        eyebrow={`${session.className} · ${session.durationSeconds / 60} min`}
+        meta={`${session.className} · ${session.durationSeconds / 60} min`}
         title={session.quizTitle}
         description={`Kod ${session.code} · ${maxPoints} ${pointWord(maxPoints)} · ${studentRows.length} ${studentWord(studentRows.length)} na spisku`}
         actions={

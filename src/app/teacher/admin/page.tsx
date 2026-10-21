@@ -1,9 +1,9 @@
 import { eq, inArray } from "drizzle-orm";
 import Link from "next/link";
-import { ArrowRight, GraduationCap, ShieldCheck, Users } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { db } from "@/db";
 import { classes, sessions, students, teachers } from "@/db/schema";
-import { PageHeader, StatCard } from "@/components/ui";
+import { PageHeader, StatRow } from "@/components/ui";
 import { classWord, formatDate, initials, testWord } from "@/lib/format";
 import { requireAdmin } from "@/lib/guard";
 import { CreateTeacherForm } from "./CreateTeacherForm";
@@ -57,27 +57,31 @@ export default async function AdminPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Samo za administratora"
+        meta="Samo za administratora"
         title="Administracija"
         description="Nalozi nastavnika i pregled svih odjeljenja u školi. Rezultate odjeljenja vidi nastavnik i administrator."
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Nastavnici" value={teacherRows.length} icon={Users} />
-        <StatCard label="Odjeljenja" value={classRows.length} icon={GraduationCap} />
-        <StatCard label="Učenici" value={studentRows.length} icon={Users} />
-        <StatCard label="Testovi" value={sessionRows.length} icon={ShieldCheck} />
+      <div>
+        <StatRow
+          items={[
+            { label: "Nastavnici", value: teacherRows.length },
+            { label: "Odjeljenja", value: classRows.length },
+            { label: "Učenici", value: studentRows.length },
+            { label: "Testovi", value: sessionRows.length },
+          ]}
+        />
       </div>
 
       <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
-        <section className="card overflow-hidden">
-          <div className="border-b border-line px-5 py-4">
-            <h2 className="text-sm font-semibold">Nalozi</h2>
+        <section className="sheet overflow-hidden">
+          <div className="border-b border-rule px-5 py-4">
+            <h2 className="section-title">Nalozi</h2>
             <p className="text-xs text-muted">
               Nastavnici se ne registruju sami — dodaje ih administrator.
             </p>
           </div>
-          <ul className="divide-y divide-line">
+          <ul className="divide-y divide-rule-soft">
             {teacherRows.map((teacher) => {
               const classCount = classRows.filter(
                 (cls) => cls.teacherId === teacher.id,
@@ -87,7 +91,7 @@ export default async function AdminPage() {
                   key={teacher.id}
                   className="flex items-center gap-3 px-5 py-3.5"
                 >
-                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand-soft text-xs font-bold text-brand-dark">
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-forest-wash text-xs font-bold text-forest-deep">
                     {initials(teacher.name)}
                   </span>
                   <div className="min-w-0 flex-1">
@@ -98,8 +102,8 @@ export default async function AdminPage() {
                     <span
                       className={
                         teacher.role === "admin"
-                          ? "badge border-amber-200 bg-amber-soft text-amber-800"
-                          : "badge border-line bg-paper text-muted"
+                          ? "badge border-rule bg-ink-wash text-ink-soft"
+                          : "badge border-rule bg-paper text-muted"
                       }
                     >
                       {teacher.role === "admin" ? "admin" : "nastavnik"}
@@ -116,8 +120,8 @@ export default async function AdminPage() {
           </ul>
         </section>
 
-        <section className="card p-5">
-          <h2 className="text-sm font-semibold">Novi nastavnik</h2>
+        <section className="sheet p-5">
+          <h2 className="section-title">Novi nastavnik</h2>
           <p className="mb-4 mt-0.5 text-xs text-muted">
             Dobija pristup odmah, sa navedenom lozinkom.
           </p>
@@ -125,9 +129,9 @@ export default async function AdminPage() {
         </section>
       </div>
 
-      <section className="card mt-5 overflow-hidden">
-        <div className="border-b border-line px-5 py-4">
-          <h2 className="text-sm font-semibold">Sva odjeljenja</h2>
+      <section className="sheet mt-5 overflow-hidden">
+        <div className="border-b border-rule px-5 py-4">
+          <h2 className="section-title">Sva odjeljenja</h2>
           <p className="text-xs text-muted">
             Kao administrator vidiš i otvaraš svako odjeljenje.
           </p>
@@ -135,7 +139,7 @@ export default async function AdminPage() {
         {classRows.length === 0 ? (
           <p className="px-5 py-6 text-sm text-muted">Još nema odjeljenja.</p>
         ) : (
-          <ul className="divide-y divide-line">
+          <ul className="divide-y divide-rule-soft">
             {classRows.map((cls) => (
               <li key={cls.id}>
                 <Link
