@@ -88,6 +88,60 @@ function attemptStorageKey(code: string): string {
   return `ispiti_attempt_${code}`;
 }
 
+type LocalAnswerStore = {
+  token: string;
+  answers: Record<string, AnswerValue>;
+  pending: string[];
+  updatedAt: number;
+};
+
+function answersStorageKey(token: string): string {
+  return `ispiti_answers_${token}`;
+}
+
+function readLocalAnswers(token: string): LocalAnswerStore | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(answersStorageKey(token));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as LocalAnswerStore;
+    if (!parsed || parsed.token !== token || typeof parsed.answers !== "object") {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeLocalAnswers(
+  token: string,
+  answers: Record<string, AnswerValue>,
+  pending: Set<string>,
+): void {
+  if (typeof window === "undefined") return;
+  try {
+    const payload: LocalAnswerStore = {
+      token,
+      answers,
+      pending: [...pending],
+      updatedAt: Date.now(),
+    };
+    window.localStorage.setItem(answersStorageKey(token), JSON.stringify(payload));
+  } catch {
+    // Privatni režim ili pun storage — server autosave i dalje radi.
+  }
+}
+
+function clearLocalAnswers(token: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(answersStorageKey(token));
+  } catch {
+    // ignore
+  }
+}
+
 function readDeviceToken(): string | null {
   const existing = window.localStorage.getItem(deviceStorageKey());
   if (existing) return existing;
@@ -134,6 +188,10 @@ export function StudentApp({ code }: { code: string }) {
   const queueRef = useRef<Promise<void>>(Promise.resolve());
   const pendingSaves = useRef(0);
   const failedAnswers = useRef<Map<string, AnswerValue>>(new Map());
+  const pendingLocal = useRef<Set<string>>(new Set());
+  const answersRef = useRef<Record<string, AnswerValue>>({});
+  const hydratedTokenRef = useRef<string | null>(null);
+  const submittingRef = useRef(false);
   const phaseRef = useRef<Phase>("loading");
 
   useEffect(() => {
@@ -150,12 +208,51 @@ export function StudentApp({ code }: { code: string }) {
     : null;
   const remainingSeconds = remainingMs !== null ? Math.ceil(remainingMs / 1000) : null;
 
+  const retrySaves = useCallback(
+    async (tokenOverride?: string | null) => {
+      const token = tokenOverride ?? attemptToken;
+      if (!token) return;
+
+      setSaveState("saving");
+      for (const [questionId, value] of [...failedAnswers.current.entries()]) {
+        // Ako je učenik u međuvremenu promijenio odgovor, ne šalji stari.
+        if (answersRef.current[questionId] !== value) {
+          failedAnswers.current.delete(questionId);
+          continue;
+        }
+        try {
+          const response = await fetch(`/api/attempt/${token}/answer`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ questionId, value }),
+          });
+          if (!response.ok) throw new Error("save");
+          if (answersRef.current[questionId] === value) {
+            failedAnswers.current.delete(questionId);
+            pendingLocal.current.delete(questionId);
+          }
+        } catch {
+          // Ostaje u mapi za sljedeći pokušaj.
+        }
+      }
+      writeLocalAnswers(token, answersRef.current, pendingLocal.current);
+      setSaveState(failedAnswers.current.size > 0 ? "error" : "saved");
+    },
+    [attemptToken],
+  );
+
   const loadAttempt = useCallback(
     async (token: string) => {
       try {
         const response = await fetch(`/api/attempt/${token}`, { cache: "no-store" });
         if (response.status === 404) {
           window.localStorage.removeItem(attemptStorageKey(code));
+          clearLocalAnswers(token);
+          hydratedTokenRef.current = null;
+          failedAnswers.current.clear();
+          pendingLocal.current.clear();
+          answersRef.current = {};
+          setAnswers({});
           setAttemptToken(null);
           setPhase("pick");
           return;
@@ -165,11 +262,15 @@ export function StudentApp({ code }: { code: string }) {
 
         if (data.status === "submitted") {
           submittedRef.current = true;
+          hydratedTokenRef.current = token;
+          clearLocalAnswers(token);
           setAttempt(data);
           setPhase("submitted");
           return;
         }
         if (data.status === "closed") {
+          hydratedTokenRef.current = token;
+          clearLocalAnswers(token);
           setPhase("closed");
           return;
         }
@@ -182,22 +283,58 @@ export function StudentApp({ code }: { code: string }) {
         setClockOffset((data.serverNow ?? Date.now()) - Date.now());
         setDeadline(data.endsAt ? new Date(data.endsAt).getTime() : null);
         setAttempt(data);
-        setAnswers((previous) => {
-          const next = { ...previous };
+
+        if (hydratedTokenRef.current !== token) {
+          const validIds = new Set((data.questions ?? []).map((question) => question.id));
+          const serverAnswers: Record<string, AnswerValue> = {};
           for (const saved of data.saved ?? []) {
-            if (!Object.prototype.hasOwnProperty.call(next, saved.questionId)) {
-              next[saved.questionId] = saved.value;
+            if (validIds.has(saved.questionId)) {
+              serverAnswers[saved.questionId] = saved.value;
             }
           }
-          return next;
-        });
+
+          const local = readLocalAnswers(token);
+          const merged: Record<string, AnswerValue> = { ...serverAnswers };
+          const pending = new Set<string>();
+          failedAnswers.current.clear();
+
+          if (local) {
+            for (const [questionId, value] of Object.entries(local.answers)) {
+              if (!validIds.has(questionId)) continue;
+              const wasPending = local.pending.includes(questionId);
+              const hasServer = Object.prototype.hasOwnProperty.call(
+                serverAnswers,
+                questionId,
+              );
+              if (wasPending || !hasServer) {
+                merged[questionId] = value;
+                pending.add(questionId);
+                failedAnswers.current.set(questionId, value);
+              }
+            }
+          }
+
+          answersRef.current = merged;
+          setAnswers(merged);
+          pendingLocal.current = pending;
+          hydratedTokenRef.current = token;
+          writeLocalAnswers(token, merged, pending);
+
+          if (pending.size > 0) {
+            setSaveState("error");
+            void retrySaves(token);
+          } else {
+            setSaveState(Object.keys(merged).length > 0 ? "saved" : "idle");
+          }
+        }
+
         setPhase("active");
       } catch {
         setError("Veza je prekinuta. Provjeri internet i pokušaj ponovo.");
         if (phaseRef.current === "loading") setPhase("error");
       }
     },
-    [code],
+    [code, retrySaves],
   );
 
   const refreshJoin = useCallback(async () => {
@@ -269,6 +406,40 @@ export function StudentApp({ code }: { code: string }) {
     return () => window.clearInterval(timer);
   }, []);
 
+  // Počisti lokalne odgovore starijih pokušaja (max 24h).
+  useEffect(() => {
+    try {
+      const now = Date.now();
+      for (let index = window.localStorage.length - 1; index >= 0; index -= 1) {
+        const key = window.localStorage.key(index);
+        if (!key?.startsWith("ispiti_answers_")) continue;
+        const raw = window.localStorage.getItem(key);
+        if (!raw) continue;
+        try {
+          const parsed = JSON.parse(raw) as { updatedAt?: number };
+          if (!parsed.updatedAt || now - parsed.updatedAt > 24 * 60 * 60 * 1000) {
+            window.localStorage.removeItem(key);
+          }
+        } catch {
+          window.localStorage.removeItem(key);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // Kad se veza vrati, pošalji odgovore koji su ostali nespremljeni.
+  useEffect(() => {
+    const retryOnOnline = () => {
+      if (attemptToken && failedAnswers.current.size > 0) {
+        void retrySaves(attemptToken);
+      }
+    };
+    window.addEventListener("online", retryOnOnline);
+    return () => window.removeEventListener("online", retryOnOnline);
+  }, [attemptToken, retrySaves]);
+
   async function claim(student: Student) {
     if (!deviceToken) return;
     setClaiming(true);
@@ -290,6 +461,13 @@ export function StudentApp({ code }: { code: string }) {
       }
 
       window.localStorage.setItem(attemptStorageKey(code), data.token);
+      hydratedTokenRef.current = null;
+      failedAnswers.current.clear();
+      pendingLocal.current.clear();
+      answersRef.current = {};
+      submittedRef.current = false;
+      submittingRef.current = false;
+      setAnswers({});
       setAttemptToken(data.token);
       setSelected(null);
       await loadAttempt(data.token);
@@ -302,7 +480,13 @@ export function StudentApp({ code }: { code: string }) {
 
   function saveAnswer(question: AttemptQuestion, value: AnswerValue) {
     if (!attemptToken) return;
-    setAnswers((previous) => ({ ...previous, [question.id]: value }));
+
+    const next = { ...answersRef.current, [question.id]: value };
+    answersRef.current = next;
+    setAnswers(next);
+    pendingLocal.current.add(question.id);
+    writeLocalAnswers(attemptToken, next, pendingLocal.current);
+
     setSaveState("saving");
     pendingSaves.current += 1;
 
@@ -314,10 +498,21 @@ export function StudentApp({ code }: { code: string }) {
           body: JSON.stringify({ questionId: question.id, value }),
         });
         if (!response.ok) throw new Error("save");
-        failedAnswers.current.delete(question.id);
+        if (answersRef.current[question.id] === value) {
+          failedAnswers.current.delete(question.id);
+          pendingLocal.current.delete(question.id);
+        }
       } catch {
-        failedAnswers.current.set(question.id, value);
+        if (answersRef.current[question.id] === value) {
+          failedAnswers.current.set(question.id, value);
+          pendingLocal.current.add(question.id);
+        }
       } finally {
+        writeLocalAnswers(
+          attemptToken,
+          answersRef.current,
+          pendingLocal.current,
+        );
         pendingSaves.current -= 1;
         if (pendingSaves.current === 0) {
           setSaveState(failedAnswers.current.size > 0 ? "error" : "saved");
@@ -326,28 +521,9 @@ export function StudentApp({ code }: { code: string }) {
     });
   }
 
-  async function retrySaves() {
-    if (!attemptToken) return;
-    setSaveState("saving");
-    for (const [questionId, value] of [...failedAnswers.current.entries()]) {
-      try {
-        const response = await fetch(`/api/attempt/${attemptToken}/answer`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ questionId, value }),
-        });
-        if (!response.ok) throw new Error("save");
-        failedAnswers.current.delete(questionId);
-      } catch {
-        // Ostaje u mapi za sljedeći pokušaj.
-      }
-    }
-    setSaveState(failedAnswers.current.size > 0 ? "error" : "saved");
-  }
-
   const submit = useCallback(
     async (auto: boolean) => {
-      if (!attemptToken || submitting || submittedRef.current) return;
+      if (!attemptToken || submittingRef.current || submittedRef.current) return;
 
       if (!auto) {
         const unanswered = questions.length - answeredCount;
@@ -361,23 +537,42 @@ export function StudentApp({ code }: { code: string }) {
         }
       }
 
-      submittedRef.current = true;
+      submittingRef.current = true;
       setSubmitting(true);
       setError(null);
 
       try {
+        // Sačekaj da svi odgovori iz reda stignu, pa još jednom pošalji
+        // one koji su pali. Predaja ne smije zaključati test prije njih.
+        await queueRef.current;
+        if (failedAnswers.current.size > 0) {
+          await retrySaves(attemptToken);
+        }
+        if (failedAnswers.current.size > 0) {
+          setError(
+            "Neki odgovori nisu sačuvani. Provjeri internet i pokušaj ponovo.",
+          );
+          submittingRef.current = false;
+          setSubmitting(false);
+          return;
+        }
+
+        submittedRef.current = true;
         const response = await fetch(`/api/attempt/${attemptToken}/submit`, {
           method: "POST",
         });
         if (!response.ok) throw new Error("submit");
+        pendingLocal.current.clear();
+        clearLocalAnswers(attemptToken);
         setPhase("submitted");
       } catch {
         submittedRef.current = false;
+        submittingRef.current = false;
         setError("Predaja nije uspjela. Provjeri internet i pokušaj ponovo.");
         setSubmitting(false);
       }
     },
-    [attemptToken, submitting, questions.length, answeredCount],
+    [attemptToken, questions.length, answeredCount, retrySaves],
   );
 
   // Automatska predaja kad istekne vrijeme.
