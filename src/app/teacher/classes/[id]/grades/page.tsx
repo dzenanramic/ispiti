@@ -148,11 +148,6 @@ export default async function SuccessPage({
             withResults.length,
         )
       : null;
-  const best =
-    withResults.length > 0
-      ? withResults.reduce((top, row) => ((row.pct ?? 0) > (top.pct ?? 0) ? row : top))
-      : null;
-
   return (
     <>
       <PageHeader
@@ -179,7 +174,7 @@ export default async function SuccessPage({
         </span>
       </div>
 
-      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="card p-4">
           <p className="text-[10px] font-bold uppercase tracking-wide text-muted">
             Testova
@@ -210,19 +205,6 @@ export default async function SuccessPage({
           <p className="mt-1 text-xl font-semibold tabular-nums">
             {classAverage === null ? "—" : `${classAverage}%`}
           </p>
-        </div>
-        <div className="card p-4">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-muted">
-            Najbolji rezultat
-          </p>
-          <p className="mt-1 truncate text-sm font-semibold">
-            {best ? best.student.name : "—"}
-          </p>
-          {best ? (
-            <p className="mt-0.5 text-xs text-muted">
-              {best.totalScore}/{totalMax} · {best.pct}%
-            </p>
-          ) : null}
         </div>
       </div>
 
