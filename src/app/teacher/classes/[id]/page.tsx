@@ -24,11 +24,15 @@ export const metadata = { title: "Odjeljenje" };
 
 export default async function ClassPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ error?: string | string[] }>;
 }) {
   const user = await requireUser();
   const { id } = await params;
+  const { error } = await searchParams;
+  const errorMessage = typeof error === "string" ? error : null;
 
   const [cls] = await db
     .select({
@@ -62,8 +66,12 @@ export default async function ClassPage({
     .from(quizzes)
     .where(
       user.role === "admin"
-        ? eq(quizzes.archived, false)
-        : and(eq(quizzes.teacherId, user.id), eq(quizzes.archived, false)),
+        ? and(eq(quizzes.archived, false), eq(quizzes.classId, cls.id))
+        : and(
+            eq(quizzes.teacherId, user.id),
+            eq(quizzes.archived, false),
+            eq(quizzes.classId, cls.id),
+          ),
     )
     .orderBy(desc(quizzes.updatedAt));
 
@@ -95,6 +103,10 @@ export default async function ClassPage({
           .where(inArray(attempts.sessionId, sessionIds))
       : [];
 
+  const openSession = sessionRows.find(
+    (session) => session.status === "lobby" || session.status === "active",
+  );
+
   return (
     <>
       <PageHeader
@@ -116,7 +128,7 @@ export default async function ClassPage({
               Uspjeh
             </Link>
             <Link
-              href="/teacher/quizzes/new"
+              href={`/teacher/quizzes/new?classId=${cls.id}`}
               data-nav-link="true"
               className="btn btn-primary"
             >
@@ -126,6 +138,12 @@ export default async function ClassPage({
           </>
         }
       />
+
+      {errorMessage ? (
+        <div className="mb-5 border-l-2 border-pencil bg-pencil-wash px-4 py-2 font-sans text-sm text-pencil">
+          {errorMessage}
+        </div>
+      ) : null}
 
       <div className="mb-6 flex gap-1 border-b border-rule text-sm">
         <span className="border-b-2 border-forest px-3 py-2 font-semibold text-forest">
@@ -242,17 +260,40 @@ export default async function ClassPage({
             </p>
           </div>
 
-          {quizRows.length === 0 ? (
+          {openSession ? (
+            <div className="border-b border-rule bg-forest-wash/60 p-4">
+              <p className="text-[0.95rem] leading-snug">
+                Test je već otvoren: {openSession.quizTitle}
+              </p>
+              <p className="mt-0.5 font-sans text-xs text-ink-soft">
+                {openSession.status === "active"
+                  ? "Tajmer je u toku."
+                  : "Učenici mogu ulaziti sa kodom."}{" "}
+                Kod{" "}
+                <span className="font-data font-semibold text-ink">
+                  {openSession.code}
+                </span>
+              </p>
+              <Link
+                href={`/teacher/sessions/${openSession.id}`}
+                data-nav-link="true"
+                className="btn btn-primary mt-3"
+              >
+                <ArrowRight className="h-4 w-4" />
+                Nastavi test
+              </Link>
+            </div>
+          ) : quizRows.length === 0 ? (
             <div className="p-5">
               <EmptyState
                 title="Nema spremnih kvizova"
-                description="Napravi kviz, pa se vrati ovdje da pokreneš test."
+                description="Napravi kviz za ovaj razred, pa se vrati ovdje da pokreneš test."
               >
                 <Link
-              href="/teacher/quizzes/new"
-              data-nav-link="true"
-              className="btn btn-primary"
-            >
+                  href={`/teacher/quizzes/new?classId=${cls.id}`}
+                  data-nav-link="true"
+                  className="btn btn-primary"
+                >
                   <Plus className="h-4 w-4" />
                   Napravi kviz
                 </Link>
@@ -281,7 +322,12 @@ export default async function ClassPage({
                   <label htmlFor="duration" className="label">
                     Trajanje
                   </label>
-                  <select id="duration" name="duration" className="select" defaultValue="300">
+                  <select
+                    id="duration"
+                    name="duration"
+                    className="select"
+                    defaultValue="300"
+                  >
                     <option value="180">3 min</option>
                     <option value="300">5 min</option>
                     <option value="360">6 min</option>

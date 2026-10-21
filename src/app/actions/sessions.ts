@@ -7,13 +7,12 @@ import { db } from "@/db";
 import {
   answers,
   attempts,
-  classes,
   questions,
-  quizzes,
   sessions,
   students,
 } from "@/db/schema";
-import { generateCode, generateToken } from "@/lib/codes";
+import { generateToken } from "@/lib/codes";
+import { createLobbySession } from "@/lib/session-create";
 import { scoreAnswers } from "@/lib/grading";
 import { requireUser } from "@/lib/guard";
 
@@ -42,51 +41,43 @@ export async function createSessionAction(formData: FormData): Promise<void> {
   const quizId = String(formData.get("quizId") ?? "");
   const durationSeconds = parseDuration(formData.get("duration"));
 
-  const [cls] = await db
-    .select({ id: classes.id, teacherId: classes.teacherId })
-    .from(classes)
-    .where(eq(classes.id, classId))
-    .limit(1);
+  const result = await createLobbySession({
+    user,
+    classId,
+    quizId,
+    durationSeconds,
+  });
 
-  const [quiz] = await db
-    .select({ id: quizzes.id, teacherId: quizzes.teacherId })
-    .from(quizzes)
-    .where(eq(quizzes.id, quizId))
-    .limit(1);
-
-  if (!cls || !quiz) redirect(`/teacher/classes/${classId}`);
-  if (user.role !== "admin" && cls.teacherId !== user.id) {
-    redirect("/teacher/classes");
-  }
-  if (user.role !== "admin" && quiz.teacherId !== user.id) {
-    redirect(`/teacher/classes/${classId}`);
+  if (!result.ok) {
+    redirect(`/teacher/classes/${classId}?error=${encodeURIComponent(result.error)}`);
   }
 
-  let code = generateCode();
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    const [existing] = await db
-      .select({ id: sessions.id })
-      .from(sessions)
-      .where(eq(sessions.code, code))
-      .limit(1);
-    if (!existing) break;
-    code = generateCode();
+  redirect(`/teacher/sessions/${result.sessionId}`);
+}
+
+/**
+ * Pokreće test iz liste kvizova ili iz editora, bez ponovnog čuvanja kviza.
+ * Razred se uzima iz kviza; ako ga kviz još nema, traži se iz forme.
+ */
+export async function startQuizSessionAction(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  const quizId = String(formData.get("quizId") ?? "");
+  const classId = String(formData.get("classId") ?? "");
+  const durationSeconds = parseDuration(formData.get("duration"));
+  const fallback = String(formData.get("fallback") ?? "/teacher/quizzes");
+
+  const result = await createLobbySession({
+    user,
+    classId,
+    quizId,
+    durationSeconds,
+  });
+
+  if (!result.ok) {
+    redirect(`${fallback}?error=${encodeURIComponent(result.error)}`);
   }
 
-  const [created] = await db
-    .insert(sessions)
-    .values({
-      quizId: quiz.id,
-      classId: cls.id,
-      teacherId: cls.teacherId,
-      code,
-      durationSeconds,
-      status: "lobby",
-    })
-    .returning();
-
-  revalidatePath(`/teacher/classes/${classId}`);
-  redirect(`/teacher/sessions/${created.id}`);
+  redirect(`/teacher/sessions/${result.sessionId}`);
 }
 
 export async function startSessionAction(sessionId: string): Promise<void> {

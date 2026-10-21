@@ -56,13 +56,22 @@ export const quizzes = pgTable(
     teacherId: uuid("teacher_id")
       .notNull()
       .references(() => teachers.id, { onDelete: "cascade" }),
+    // Kviz se priprema za tačno jedno odjeljenje. Nije ograničenje za
+    // historijske sesije (one nose svoj class_id), ali sprečava da se isti
+    // test slučajno pokrene u drugom razredu.
+    classId: uuid("class_id").references(() => classes.id, {
+      onDelete: "set null",
+    }),
     title: text("title").notNull(),
     lesson: text("lesson").notNull().default(""),
     archived: boolean("archived").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [index("quizzes_teacher_idx").on(table.teacherId)],
+  (table) => [
+    index("quizzes_teacher_idx").on(table.teacherId),
+    index("quizzes_class_idx").on(table.classId),
+  ],
 );
 
 export const questions = pgTable(

@@ -678,7 +678,7 @@ export function StudentApp({ code }: { code: string }) {
             </div>
 
             {join.session.status === "active" ? (
-              <div className="mt-4 flex items-start gap-2 rounded-sm border border-rule bg-amber-soft px-3 py-2 text-xs text-ink-soft">
+              <div className="mt-4 flex items-start gap-2 rounded-sm border border-rule bg-ink-wash px-3 py-2 text-xs text-ink-soft">
                 <Timer className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 Test je već počeo — pridruži se odmah, vrijeme ide.
               </div>
@@ -790,7 +790,7 @@ export function StudentApp({ code }: { code: string }) {
                     remainingSeconds !== null && remainingSeconds <= 15
                       ? "border-pencil/40 bg-pencil-wash text-pencil"
                       : remainingSeconds !== null && remainingSeconds <= 60
-                        ? "border-rule bg-amber-soft text-ink-soft"
+                        ? "border-rule bg-ink-wash text-ink-soft"
                         : "border-rule bg-lift text-ink",
                   )}
                 >

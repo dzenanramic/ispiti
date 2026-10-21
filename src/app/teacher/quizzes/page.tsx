@@ -1,22 +1,40 @@
 import { desc, eq, inArray } from "drizzle-orm";
 import Link from "next/link";
-import { BookOpen, Copy, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { BookOpen, Copy, Pencil, Play, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { db } from "@/db";
-import { questions, quizzes, sessions } from "@/db/schema";
+import { classes, questions, quizzes, sessions } from "@/db/schema";
 import { archiveQuizAction, duplicateQuizAction, restoreQuizAction } from "@/app/actions/quizzes";
+import { startQuizSessionAction } from "@/app/actions/sessions";
 import { ConfirmSubmit } from "@/components/ConfirmSubmit";
 import { EmptyState, PageHeader } from "@/components/ui";
-import { formatDate, pointWord, questionWord } from "@/lib/format";
+import { formatDate, questionWord } from "@/lib/format";
 import { requireUser } from "@/lib/guard";
 
 export const metadata = { title: "Kvizovi" };
 
-export default async function QuizzesPage() {
+export default async function QuizzesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string | string[] }>;
+}) {
   const user = await requireUser();
+  const { error } = await searchParams;
+  const errorMessage = typeof error === "string" ? error : null;
 
   const quizRows = await db
-    .select()
+    .select({
+      id: quizzes.id,
+      teacherId: quizzes.teacherId,
+      classId: quizzes.classId,
+      title: quizzes.title,
+      lesson: quizzes.lesson,
+      archived: quizzes.archived,
+      createdAt: quizzes.createdAt,
+      updatedAt: quizzes.updatedAt,
+      className: classes.name,
+    })
     .from(quizzes)
+    .leftJoin(classes, eq(quizzes.classId, classes.id))
     .where(
       user.role === "admin"
         ? undefined
@@ -54,7 +72,7 @@ export default async function QuizzesPage() {
       <PageHeader
         meta="Priprema"
         title="Kvizovi"
-        description="Kviz je skup pitanja koja ponavljaš iz odjeljenja u odjeljenje. Test je jedna sesija tog kviza."
+        description="Kviz pripada jednom razredu. Test je jedna sesija tog kviza — otvara se kodom ili QR-om."
         actions={
           <Link href="/teacher/quizzes/new" data-nav-link="true" className="btn btn-primary">
             <Plus className="h-4 w-4" />
@@ -62,6 +80,12 @@ export default async function QuizzesPage() {
           </Link>
         }
       />
+
+      {errorMessage ? (
+        <div className="mb-5 border-l-2 border-pencil bg-pencil-wash px-4 py-2 font-sans text-sm text-pencil">
+          {errorMessage}
+        </div>
+      ) : null}
 
       {activeQuizzes.length === 0 ? (
         <EmptyState
@@ -100,13 +124,34 @@ export default async function QuizzesPage() {
                       ) : null}
                     </div>
                     <p className="mt-0.5 truncate text-xs text-muted">
-                      {quiz.lesson || "Bez naziva lekcije"} · {questionCount}{" "}
-                      {questionWord(questionCount)} · {questionCount}{" "}
-                      {pointWord(questionCount)} · {formatDate(quiz.updatedAt)}
+                      {quiz.className ?? "Neraspoređen razred"} ·{" "}
+                      {quiz.lesson || "bez naziva lekcije"} · {questionCount}{" "}
+                      {questionWord(questionCount)} ·{" "}
+                      {formatDate(quiz.updatedAt)}
                     </p>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-1.5">
+                    {quiz.classId ? (
+                      <form action={startQuizSessionAction}>
+                        <input type="hidden" name="quizId" value={quiz.id} />
+                        <input type="hidden" name="classId" value={quiz.classId} />
+                        <input type="hidden" name="duration" value="300" />
+                        <input
+                          type="hidden"
+                          name="fallback"
+                          value="/teacher/quizzes"
+                        />
+                        <button
+                          type="submit"
+                          className="btn btn-primary !py-1.5 text-xs"
+                        >
+                          <Play className="h-3.5 w-3.5" />
+                          Pokreni
+                        </button>
+                      </form>
+                    ) : null}
+
                     {used ? (
                       <form action={duplicateQuizAction.bind(null, quiz.id)}>
                         <button type="submit" className="btn btn-secondary !py-1.5 text-xs">
@@ -121,7 +166,7 @@ export default async function QuizzesPage() {
                         className="btn btn-secondary !py-1.5 text-xs"
                       >
                         <Pencil className="h-3.5 w-3.5" />
-                        Uredi
+                        {quiz.classId ? "Uredi" : "Dodijeli razred"}
                       </Link>
                     )}
 

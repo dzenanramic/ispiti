@@ -129,6 +129,7 @@ async function main() {
     .insert(schema.quizzes)
     .values({
       teacherId: teacher.id,
+      classId: class4.id,
       title: "Uvod u hadiske znanosti",
       lesson: "Lekcija 1 — definicija i dijelovi hadisa",
     })
@@ -189,6 +190,7 @@ async function main() {
     .insert(schema.quizzes)
     .values({
       teacherId: teacher.id,
+      classId: class4.id,
       title: "Vrste hadisa prema broju prenosilaca",
       lesson: "Lekcija 2 — mutevatir, ahad i podjele",
     })
@@ -245,12 +247,15 @@ async function main() {
     .insert(schema.quizzes)
     .values({
       teacherId: teacher.id,
+      classId: class3.id,
       title: "Ponavljanje — hadiski termini",
       lesson: "Lekcije 1 i 2",
     })
     .returning();
 
-  await db.insert(schema.questions).values([
+  const quiz3Questions = await db
+    .insert(schema.questions)
+    .values([
     {
       quizId: quiz3.id,
       position: 0,
@@ -296,7 +301,65 @@ async function main() {
       options: [],
       correct: false,
     },
-  ]);
+    ])
+    .returning();
+
+  // 3. razred ne radi iste testove kao 4. razred — zaseban, jednostavniji kviz.
+  const [quiz4] = await db
+    .insert(schema.quizzes)
+    .values({
+      teacherId: teacher.id,
+      classId: class3.id,
+      title: "Uvod u hadiske znanosti — 3. razred",
+      lesson: "Lekcija 1 — osnovni pojmovi",
+    })
+    .returning();
+
+  const quiz4Questions = await db
+    .insert(schema.questions)
+    .values([
+      {
+        quizId: quiz4.id,
+        position: 0,
+        type: "tf",
+        prompt: "Hadis je govor Poslanika, s.a.v.s.",
+        options: [],
+        correct: true,
+      },
+      {
+        quizId: quiz4.id,
+        position: 1,
+        type: "single",
+        prompt: "Koji dio hadisa je tekst?",
+        options: ["Matn", "Isnad", "Sened", "Šerh"],
+        correct: 0,
+      },
+      {
+        quizId: quiz4.id,
+        position: 2,
+        type: "cloze",
+        prompt: "Niz prenosilaca hadisa naziva se _____.",
+        options: ["isnad", "matn", "šerh", "tefsir"],
+        correct: 0,
+      },
+      {
+        quizId: quiz4.id,
+        position: 3,
+        type: "single",
+        prompt: "Ko prenosi hadis od Poslanika, s.a.v.s.?",
+        options: ["Sahabija", "Tabi'in", "Imam", "Halifa"],
+        correct: 0,
+      },
+      {
+        quizId: quiz4.id,
+        position: 4,
+        type: "tf",
+        prompt: "Hadis se prenosi od Poslanika, s.a.v.s.",
+        options: [],
+        correct: true,
+      },
+    ])
+    .returning();
 
   // Deterministički „slučajni" rezultati za demo tabelu.
   function seededScore(seed: number): number {
@@ -381,11 +444,12 @@ async function main() {
 
   await seedClosedSession(class4.id, quiz1.id, quiz1Questions, "HADIS1", 7, students4);
   await seedClosedSession(class4.id, quiz2.id, quiz2Questions, "HADIS2", 3, students4);
-  await seedClosedSession(class3.id, quiz2.id, quiz2Questions, "HADIS3", 9, students3);
+  await seedClosedSession(class3.id, quiz4.id, quiz4Questions, "HADIS3", 9, students3);
+  await seedClosedSession(class3.id, quiz3.id, quiz3Questions, "HADIS4", 5, students3);
 
   // Jedna otvorena sesija za testiranje učeničkog toka.
   await db.insert(schema.sessions).values({
-    quizId: quiz1.id,
+    quizId: quiz4.id,
     classId: class3.id,
     teacherId: teacher.id,
     code: "TEST22",

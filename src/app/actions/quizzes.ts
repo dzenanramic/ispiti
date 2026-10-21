@@ -1,12 +1,13 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db";
-import { questions, quizzes, sessions } from "@/db/schema";
+import { classes, questions, quizzes, sessions } from "@/db/schema";
 import { requireUser } from "@/lib/guard";
+import { createLobbySession } from "@/lib/session-create";
 import type { QuizSaveInput } from "@/lib/types";
 
 const questionSchema = z.object({
@@ -18,12 +19,17 @@ const questionSchema = z.object({
 
 const quizSchema = z.object({
   id: z.string().uuid().optional(),
+  classId: z.string().uuid("Izaberi razred kojem pripada kviz."),
   title: z.string().trim().min(3, "Naziv kviza je prekratak.").max(160),
   lesson: z.string().trim().max(200),
   questions: z.array(questionSchema).min(1, "Dodaj najmanje jedno pitanje.").max(20),
+  start: z.boolean().optional(),
+  durationSeconds: z.number().int().min(120).max(900).optional(),
 });
 
-export type SaveQuizResult = { ok: true; id: string } | { ok: false; error: string };
+export type SaveQuizResult =
+  | { ok: true; id: string; sessionId?: string; sessionError?: string }
+  | { ok: false; error: string };
 
 type CleanQuestion = {
   type: "tf" | "single" | "cloze";
@@ -89,6 +95,40 @@ export async function saveQuizAction(input: QuizSaveInput): Promise<SaveQuizResu
   const { questions: cleaned, error } = cleanQuestions(data.questions);
   if (error) return { ok: false, error };
 
+  const [cls] = await db
+    .select({ id: classes.id, teacherId: classes.teacherId })
+    .from(classes)
+    .where(eq(classes.id, data.classId))
+    .limit(1);
+
+  if (!cls) return { ok: false, error: "Izabrano odjeljenje ne postoji." };
+  if (user.role !== "admin" && cls.teacherId !== user.id) {
+    return { ok: false, error: "Nemaš pristup izabranom odjeljenju." };
+  }
+
+  // Ako se test odmah otvara, provjeri zauzetost razreda prije nego što
+  // sačuvamo kviz — da ne ostane sačuvan kviz bez otvorenog testa.
+  if (data.start) {
+    const [open] = await db
+      .select({ id: sessions.id })
+      .from(sessions)
+      .where(
+        and(
+          eq(sessions.classId, cls.id),
+          inArray(sessions.status, ["lobby", "active"]),
+        ),
+      )
+      .limit(1);
+
+    if (open) {
+      return {
+        ok: false,
+        error:
+          "U ovom odjeljenju je već otvoren test. Zatvori ga prije nego što otvoriš novi.",
+      };
+    }
+  }
+
   if (data.id) {
     const [existing] = await db
       .select()
@@ -118,7 +158,12 @@ export async function saveQuizAction(input: QuizSaveInput): Promise<SaveQuizResu
     await db.transaction(async (tx) => {
       await tx
         .update(quizzes)
-        .set({ title: data.title, lesson: data.lesson, updatedAt: new Date() })
+        .set({
+          title: data.title,
+          lesson: data.lesson,
+          classId: cls.id,
+          updatedAt: new Date(),
+        })
         .where(eq(quizzes.id, data.id!));
       await tx.delete(questions).where(eq(questions.quizId, data.id!));
       await tx.insert(questions).values(
@@ -135,6 +180,21 @@ export async function saveQuizAction(input: QuizSaveInput): Promise<SaveQuizResu
 
     revalidatePath("/teacher/quizzes");
     revalidatePath(`/teacher/quizzes/${data.id}`);
+    revalidatePath(`/teacher/classes/${cls.id}`);
+
+    if (data.start) {
+      const session = await createLobbySession({
+        user,
+        classId: cls.id,
+        quizId: data.id,
+        durationSeconds: data.durationSeconds,
+      });
+      if (!session.ok) {
+        return { ok: true, id: data.id, sessionError: session.error };
+      }
+      return { ok: true, id: data.id, sessionId: session.sessionId };
+    }
+
     return { ok: true, id: data.id };
   }
 
@@ -143,6 +203,7 @@ export async function saveQuizAction(input: QuizSaveInput): Promise<SaveQuizResu
       .insert(quizzes)
       .values({
         teacherId: user.id,
+        classId: cls.id,
         title: data.title,
         lesson: data.lesson,
       })
@@ -163,6 +224,21 @@ export async function saveQuizAction(input: QuizSaveInput): Promise<SaveQuizResu
   });
 
   revalidatePath("/teacher/quizzes");
+  revalidatePath(`/teacher/classes/${cls.id}`);
+
+  if (data.start) {
+    const session = await createLobbySession({
+      user,
+      classId: cls.id,
+      quizId,
+      durationSeconds: data.durationSeconds,
+    });
+    if (!session.ok) {
+      return { ok: true, id: quizId, sessionError: session.error };
+    }
+    return { ok: true, id: quizId, sessionId: session.sessionId };
+  }
+
   return { ok: true, id: quizId };
 }
 
@@ -183,6 +259,7 @@ export async function duplicateQuizAction(quizId: string): Promise<void> {
       .insert(quizzes)
       .values({
         teacherId: user.id,
+        classId: quiz.classId,
         title: `${quiz.title} (kopija)`.slice(0, 160),
         lesson: quiz.lesson,
       })

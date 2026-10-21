@@ -9,6 +9,7 @@ import {
   ArrowUp,
   FileText,
   Loader2,
+  Play,
   Plus,
   Save,
   Trash2,
@@ -16,13 +17,17 @@ import {
 } from "lucide-react";
 import { clsx } from "clsx";
 import { saveQuizAction } from "@/app/actions/quizzes";
+import { startQuizSessionAction } from "@/app/actions/sessions";
 import { parseQuestions } from "@/lib/parse-questions";
 import type { QuestionInput, QuestionType } from "@/lib/types";
 
 type EditorQuestion = QuestionInput & { key: string };
 
+type ClassOption = { id: string; name: string };
+
 type InitialQuiz = {
   id: string;
+  classId: string | null;
   title: string;
   lesson: string;
   questions: QuestionInput[];
@@ -82,10 +87,28 @@ function withCorrect(q: EditorQuestion, correct: number): EditorQuestion {
   return { ...q, correct };
 }
 
-export function QuizEditor({ initial }: { initial: InitialQuiz | null }) {
+export function QuizEditor({
+  initial,
+  classes,
+  initialClassId,
+  initialError,
+}: {
+  initial: InitialQuiz | null;
+  classes: ClassOption[];
+  initialClassId: string | null;
+  initialError?: string | null;
+}) {
   const router = useRouter();
   const [title, setTitle] = useState(initial?.title ?? "");
   const [lesson, setLesson] = useState(initial?.lesson ?? "");
+  const [classId, setClassId] = useState(
+    initial?.classId ?? initialClassId ?? "",
+  );
+  const [duration, setDuration] = useState(300);
+  const [savedId, setSavedId] = useState<string | null>(initial?.id ?? null);
+  const [pendingIntent, setPendingIntent] = useState<"save" | "start" | null>(
+    null,
+  );
   const [questions, setQuestions] = useState<EditorQuestion[]>(
     initial
       ? initial.questions.map((question, index) => ({
@@ -94,7 +117,7 @@ export function QuizEditor({ initial }: { initial: InitialQuiz | null }) {
         }))
       : [blankQuestion("single")],
   );
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError ?? null);
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState("");
   const [importErrors, setImportErrors] = useState<string[]>([]);
@@ -190,6 +213,7 @@ export function QuizEditor({ initial }: { initial: InitialQuiz | null }) {
   }
 
   function validate(): string | null {
+    if (!classId) return "Izaberi razred kojem pripada kviz.";
     if (title.trim().length < 3) return "Naziv kviza mora imati najmanje 3 znaka.";
     if (questions.length === 0) return "Dodaj najmanje jedno pitanje.";
 
@@ -223,19 +247,24 @@ export function QuizEditor({ initial }: { initial: InitialQuiz | null }) {
     return null;
   }
 
-  function save() {
+  function save(intent: "save" | "start") {
     setError(null);
+    setPendingIntent(intent);
     const validation = validate();
     if (validation) {
       setError(validation);
+      setPendingIntent(null);
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
 
     const payload = {
-      id: initial?.id,
+      id: savedId ?? undefined,
+      classId,
       title: title.trim(),
       lesson: lesson.trim(),
+      start: intent === "start",
+      durationSeconds: duration,
       questions: questions.map((question) => {
         const prompt =
           question.type === "cloze" && !/_{2,}/.test(question.prompt)
@@ -264,9 +293,28 @@ export function QuizEditor({ initial }: { initial: InitialQuiz | null }) {
       const result = await saveQuizAction(payload);
       if (!result.ok) {
         setError(result.error);
+        setPendingIntent(null);
         window.scrollTo({ top: 0, behavior: "smooth" });
         return;
       }
+
+      setSavedId(result.id);
+
+      if (result.sessionId) {
+        router.push(`/teacher/sessions/${result.sessionId}`);
+        router.refresh();
+        return;
+      }
+
+      if (result.sessionError) {
+        router.replace(
+          `/teacher/quizzes/${result.id}?error=${encodeURIComponent(
+            `Kviz je sačuvan, ali test nije otvoren: ${result.sessionError}`,
+          )}`,
+        );
+        return;
+      }
+
       router.push("/teacher/quizzes");
       router.refresh();
     });
@@ -293,28 +341,66 @@ export function QuizEditor({ initial }: { initial: InitialQuiz | null }) {
             {Math.max(1, Math.ceil(questions.length * 0.8))} min
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Link href="/teacher/quizzes" className="btn btn-secondary">
             Odustani
           </Link>
-          <button
-            type="button"
-            onClick={save}
-            disabled={saving}
-            className="btn btn-primary"
-          >
-            {saving ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4" />
-            )}
-            {saving ? "Čuvam…" : "Sačuvaj kviz"}
-          </button>
+          {initial?.locked ? (
+            <form action={startQuizSessionAction}>
+              <input type="hidden" name="quizId" value={initial.id} />
+              <input type="hidden" name="classId" value={classId} />
+              <input type="hidden" name="duration" value={duration} />
+              <input
+                type="hidden"
+                name="fallback"
+                value={`/teacher/quizzes/${initial.id}`}
+              />
+              <button
+                type="submit"
+                disabled={!classId}
+                className="btn btn-primary"
+              >
+                <Play className="h-4 w-4" />
+                Otvori test
+              </button>
+            </form>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => save("save")}
+                disabled={saving}
+                className="btn btn-secondary"
+              >
+                {saving && pendingIntent === "save" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                {saving && pendingIntent === "save" ? "Čuvam…" : "Sačuvaj"}
+              </button>
+              <button
+                type="button"
+                onClick={() => save("start")}
+                disabled={saving}
+                className="btn btn-primary"
+              >
+                {saving && pendingIntent === "start" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Play className="h-4 w-4" />
+                )}
+                {saving && pendingIntent === "start"
+                  ? "Otvaram…"
+                  : "Sačuvaj i otvori test"}
+              </button>
+            </>
+          )}
         </div>
       </div>
 
       {initial?.locked ? (
-        <div className="mb-4 flex items-start gap-2 rounded-sm border border-rule bg-amber-soft px-3.5 py-2.5 text-sm text-ink-soft">
+        <div className="mb-4 flex items-start gap-2 rounded-sm border border-rule bg-ink-wash px-3.5 py-2.5 text-sm text-ink-soft">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>
             Ovaj kviz je već korišten u testu. Izmjene nisu dozvoljene da bi
@@ -360,6 +446,60 @@ export function QuizEditor({ initial }: { initial: InitialQuiz | null }) {
               placeholder="npr. Lekcija 1 — definicija"
               dir="auto"
             />
+          </div>
+        </div>
+
+        <div className="mt-3 grid gap-3 sm:grid-cols-[1.4fr_1fr]">
+          <div>
+            <label htmlFor="classId" className="label">
+              Razred
+            </label>
+            <select
+              id="classId"
+              value={classId}
+              onChange={(event) => setClassId(event.target.value)}
+              className="select"
+              disabled={Boolean(initial?.locked) || classes.length === 0}
+            >
+              <option value="">Izaberi razred</option>
+              {classes.map((cls) => (
+                <option key={cls.id} value={cls.id}>
+                  {cls.name}
+                </option>
+              ))}
+            </select>
+            {classes.length === 0 ? (
+              <p className="mt-1 text-[0.72rem] leading-relaxed text-muted">
+                Prvo dodaj odjeljenje, pa se vrati na kviz.{" "}
+                <Link href="/teacher/classes" className="link">
+                  Otvori odjeljenja
+                </Link>
+              </p>
+            ) : (
+              <p className="mt-1 text-[0.72rem] leading-relaxed text-muted">
+                Kviz se pokreće samo u ovom razredu. Za drugi razred napravi
+                kopiju.
+              </p>
+            )}
+          </div>
+          <div>
+            <label htmlFor="duration" className="label">
+              Trajanje testa
+            </label>
+            <select
+              id="duration"
+              value={duration}
+              onChange={(event) => setDuration(Number(event.target.value))}
+              className="select"
+            >
+              <option value="180">3 min</option>
+              <option value="300">5 min</option>
+              <option value="360">6 min</option>
+              <option value="600">10 min</option>
+            </select>
+            <p className="mt-1 text-[0.72rem] leading-relaxed text-muted">
+              Tajmer kreće tek kad pritisneš „Počni“ u testu.
+            </p>
           </div>
         </div>
       </div>
@@ -649,19 +789,53 @@ Tačno: isnad`}
           <Plus className="h-4 w-4" />
           Dodaj pitanje
         </button>
-        <button
-          type="button"
-          onClick={save}
-          disabled={saving}
-          className="btn btn-primary"
-        >
-          {saving ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Save className="h-4 w-4" />
-          )}
-          {saving ? "Čuvam…" : "Sačuvaj kviz"}
-        </button>
+        {initial?.locked ? (
+          <form action={startQuizSessionAction}>
+            <input type="hidden" name="quizId" value={initial.id} />
+            <input type="hidden" name="classId" value={classId} />
+            <input type="hidden" name="duration" value={duration} />
+            <input
+              type="hidden"
+              name="fallback"
+              value={`/teacher/quizzes/${initial.id}`}
+            />
+            <button type="submit" disabled={!classId} className="btn btn-primary">
+              <Play className="h-4 w-4" />
+              Otvori test
+            </button>
+          </form>
+        ) : (
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => save("save")}
+              disabled={saving}
+              className="btn btn-secondary"
+            >
+              {saving && pendingIntent === "save" ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              {saving && pendingIntent === "save" ? "Čuvam…" : "Sačuvaj"}
+            </button>
+            <button
+              type="button"
+              onClick={() => save("start")}
+              disabled={saving}
+              className="btn btn-primary"
+            >
+              {saving && pendingIntent === "start" ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Play className="h-4 w-4" />
+              )}
+              {saving && pendingIntent === "start"
+                ? "Otvaram…"
+                : "Sačuvaj i otvori test"}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
