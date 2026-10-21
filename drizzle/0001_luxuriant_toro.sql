@@ -1,0 +1,1 @@
+ALTER TABLE "sessions" ADD COLUMN "join_locked" boolean DEFAULT false NOT NULL;
