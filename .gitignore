@@ -46,3 +46,6 @@ next-env.d.ts
 
 # privremeni deploy podaci (nije za git)
 .supabase-urls.json
+
+# lokalni QA snimci
+.qa/
