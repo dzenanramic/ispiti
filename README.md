@@ -39,6 +39,7 @@ Bodovi iz svih testova se sabiraju u tabeli odjeljenja. Nastavnik sam upisuje oc
 - Duplikovanje kviza za drugo odjeljenje; arhiviranje.
 - Sesija: QR + 6-znakovni kod, lobby, sinhronizovani tajmer (3/5/6/10 min), zaključavanje ulaza, produženje vremena, poništavanje pokušaja, ručni upis rezultata za odsutne.
 - Učenik bez naloga: ime se veže za uređaj za tu sesiju, jedan pokušaj po učeniku.
+- Lokalno čuvanje odgovora: svaki odgovor se upisuje u `localStorage` prije slanja; poslije reloada se vraća i ponovo šalje. Predaja čeka da svi odgovori stignu na server.
 - Rezultati uživo, matrica učenik × pitanje, uspješnost po pitanju, štampa i CSV izvoz.
 - Arapski tekst i RTL prikaz u pitanjima i ponuđenim odgovorima.
 - Mobilni učenički ekran prilagođen telefonu.
@@ -222,7 +223,8 @@ Kviz i sesija su odvojeni namjerno: isti kviz ide u 3. i 4. razred, a svako izvo
 - **Nema djelimičnih bodova**: 1 pitanje = 1 bod; tačno ili netačno.
 - **Nema e-dnevnika**, roditeljskog portala ni sinhronizacije sa Google Classroomom.
 - **Nema AI-a ni uvoza dokumenata.** Sljedeći korak, ako se pokaže potreba, je da AI predloži pitanja iz `.docx` lekcije, a nastavnik ih pregleda i izmijeni.
-- **Nema emaila**: reset lozinke radi administrator preko CLI-ja ili nastavnik preko stranice **Nalog**.
+- **Nema emaila**: reset lozinke radi administrator preko CLI-ja ili nastavnik preko stranice **Nalog**. Promjena lozinke odjavljuje sve ostale uređaje.
+- **Nema service workera**: ako je telefon potpuno offline, sama stranica se ne može učitati. Odgovori ipak ostaju u `localStorage` i vraćaju se čim se stranica učita sa mrežom; predaja se ne izvršava dok odgovori ne stignu na server.
 - **Nema brisanja odjeljenja** u UI-u; učenici se deaktiviraju da historija ostane. Podaci se čuvaju do kraja školske godine; za brisanje je potreban SQL/dogovor.
 - **QR/kod je namijenjen učionici.** Svako sa kodom može vidjeti spisak imena i pridružiti se; ne dijeliti kod izvan odjeljenja.
 - **Supabase free** nije predviđen za ozbiljan produkcioni saobraćaj; za školu je dovoljan, ali provjeri pauziranje i limite.
