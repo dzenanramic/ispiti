@@ -94,14 +94,18 @@ export async function GET(
     .from(grades)
     .where(eq(grades.classId, cls.id));
 
-  const totalMax = sessionRows.reduce(
+  const gradedSessions = sessionRows.filter((session) =>
+    attemptRows.some((attempt) => attempt.sessionId === session.id),
+  );
+
+  const totalMax = gradedSessions.reduce(
     (total, session) => total + (maxByQuiz.get(session.quizId) ?? 0),
     0,
   );
 
   const header = [
     "Učenik",
-    ...sessionRows.map(
+    ...gradedSessions.map(
       (session) =>
         `${session.quizTitle} (${formatDate(session.date ?? session.createdAt)})`,
     ),
@@ -114,7 +118,7 @@ export async function GET(
   const lines = [header.map(csvCell).join(";")];
 
   for (const student of studentRows) {
-    const sessionCells = sessionRows.map((session) => {
+    const sessionCells = gradedSessions.map((session) => {
       const attempt = attemptRows.find(
         (row) => row.sessionId === session.id && row.studentId === student.id,
       );

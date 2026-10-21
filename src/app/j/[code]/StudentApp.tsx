@@ -134,6 +134,11 @@ export function StudentApp({ code }: { code: string }) {
   const queueRef = useRef<Promise<void>>(Promise.resolve());
   const pendingSaves = useRef(0);
   const failedAnswers = useRef<Map<string, AnswerValue>>(new Map());
+  const phaseRef = useRef<Phase>("loading");
+
+  useEffect(() => {
+    phaseRef.current = phase;
+  }, [phase]);
 
   const questions = attempt?.questions ?? [];
   const answeredCount = questions.filter((question) =>
@@ -156,6 +161,7 @@ export function StudentApp({ code }: { code: string }) {
           return;
         }
         const data = (await response.json()) as AttemptResponse;
+        setError(null);
 
         if (data.status === "submitted") {
           submittedRef.current = true;
@@ -187,7 +193,8 @@ export function StudentApp({ code }: { code: string }) {
         });
         setPhase("active");
       } catch {
-        setError("Veza je prekinuta. Osvježi stranicu.");
+        setError("Veza je prekinuta. Provjeri internet i pokušaj ponovo.");
+        if (phaseRef.current === "loading") setPhase("error");
       }
     },
     [code],
@@ -207,6 +214,7 @@ export function StudentApp({ code }: { code: string }) {
       }
       const data = (await response.json()) as JoinResponse;
       setJoin(data);
+      setError(null);
 
       if (data.me) {
         window.localStorage.setItem(attemptStorageKey(code), data.me.token);
@@ -229,6 +237,7 @@ export function StudentApp({ code }: { code: string }) {
       setPhase("pick");
     } catch {
       setError("Ne mogu se povezati. Provjeri internet.");
+      if (phaseRef.current === "loading") setPhase("error");
     }
   }, [code, deviceToken, loadAttempt]);
 
@@ -418,6 +427,18 @@ export function StudentApp({ code }: { code: string }) {
             <p className="mt-1.5 text-sm text-muted">
               {error ?? "Provjeri kod kod nastavnika."}
             </p>
+            <button
+              type="button"
+              onClick={() => {
+                setError(null);
+                setPhase("loading");
+                void refreshJoin();
+              }}
+              className="btn btn-secondary mt-4"
+            >
+              <RotateCw className="h-4 w-4" />
+              Pokušaj ponovo
+            </button>
           </div>
         ) : null}
 
@@ -550,6 +571,9 @@ export function StudentApp({ code }: { code: string }) {
             <p className="mt-4 text-[11px] text-muted">
               Ne zatvaraj stranicu. Kada test počne, pitanja se pojavljuju sama.
             </p>
+            {error ? (
+              <p className="mt-3 text-[11px] text-danger">{error}</p>
+            ) : null}
           </div>
         ) : null}
 

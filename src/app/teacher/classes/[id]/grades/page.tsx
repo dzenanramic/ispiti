@@ -105,7 +105,13 @@ export default async function GradesPage({
     .where(eq(grades.classId, cls.id))
     .orderBy(desc(grades.createdAt));
 
-  const totalMax = sessionRows.reduce(
+  // Test koji nije imao nijedan pokušaj ne ulazi u tabelu — inače greškom
+  // otvoren i zatvoren test podiže maksimum svima.
+  const gradedSessions = sessionRows.filter((session) =>
+    attemptRows.some((attempt) => attempt.sessionId === session.id),
+  );
+
+  const totalMax = gradedSessions.reduce(
     (total, session) => total + (maxByQuiz.get(session.quizId) ?? 0),
     0,
   );
@@ -200,7 +206,7 @@ export default async function GradesPage({
           <div>
             <h2 className="text-sm font-semibold">Tabela bodova i ocjena</h2>
             <p className="text-xs text-muted">
-              {sessionRows.length} {testWord(sessionRows.length)} · maksimum {totalMax}{" "}
+              {gradedSessions.length} {testWord(gradedSessions.length)} · maksimum {totalMax}{" "}
               {pointWord(totalMax)}
             </p>
           </div>
@@ -219,7 +225,7 @@ export default async function GradesPage({
                   <th className="sticky left-0 z-10 bg-paper/95 px-4 py-2.5 font-bold">
                     Učenik
                   </th>
-                  {sessionRows.map((session) => (
+                  {gradedSessions.map((session) => (
                     <th key={session.id} className="px-3 py-2.5 text-center font-bold">
                       <span className="block max-w-[8rem] truncate normal-case tracking-normal text-ink">
                         {session.quizTitle}
@@ -247,7 +253,7 @@ export default async function GradesPage({
                       <td className="sticky left-0 z-10 bg-white px-4 py-3 font-medium">
                         <span className="block max-w-[13rem] truncate">{student.name}</span>
                       </td>
-                      {sessionRows.map((session) => {
+                      {gradedSessions.map((session) => {
                         const attempt = attemptRows.find(
                           (row) =>
                             row.sessionId === session.id && row.studentId === student.id,
