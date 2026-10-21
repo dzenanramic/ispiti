@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
@@ -66,20 +66,41 @@ export async function addStudentsAction(
   }
 
   const existing = await db
-    .select({ name: students.name })
+    .select({ id: students.id, name: students.name, active: students.active })
     .from(students)
-    .where(and(eq(students.classId, classId), eq(students.active, true)));
-  const existingKeys = new Set(
-    existing.map((student) => student.name.toLocaleLowerCase("bs")),
-  );
+    .where(eq(students.classId, classId));
 
-  const toInsert = names
-    .filter((name) => !existingKeys.has(name.toLocaleLowerCase("bs")))
-    .slice(0, 100)
-    .map((name) => ({ classId: cls.id, name }));
+  const byName = new Map<string, { id: string; active: boolean }>();
+  for (const student of existing) {
+    const key = student.name.toLocaleLowerCase("bs");
+    if (!byName.has(key)) byName.set(key, { id: student.id, active: student.active });
+  }
+
+  const toReactivate: string[] = [];
+  const toInsert: { classId: string; name: string }[] = [];
+
+  for (const name of names) {
+    const key = name.toLocaleLowerCase("bs");
+    const found = byName.get(key);
+    if (found) {
+      if (!found.active) {
+        found.active = true;
+        toReactivate.push(found.id);
+      }
+      continue;
+    }
+    toInsert.push({ classId: cls.id, name });
+  }
+
+  if (toReactivate.length > 0) {
+    await db
+      .update(students)
+      .set({ active: true })
+      .where(inArray(students.id, toReactivate));
+  }
 
   if (toInsert.length > 0) {
-    await db.insert(students).values(toInsert);
+    await db.insert(students).values(toInsert.slice(0, 100));
   }
 
   revalidatePath(`/teacher/classes/${classId}`);

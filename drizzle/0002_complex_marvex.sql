@@ -1,0 +1,1 @@
+ALTER TABLE "teachers" ADD COLUMN "password_changed_at" timestamp with time zone DEFAULT now() NOT NULL;

@@ -3,7 +3,12 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { teachers } from "@/db/schema";
-import { hashPassword, verifyPassword } from "@/lib/auth";
+import {
+  createSessionToken,
+  hashPassword,
+  setSessionCookie,
+  verifyPassword,
+} from "@/lib/auth";
 import { requireUser } from "@/lib/guard";
 
 export type PasswordState = {
@@ -39,8 +44,14 @@ export async function changePasswordAction(
 
   await db
     .update(teachers)
-    .set({ passwordHash: await hashPassword(next) })
+    .set({
+      passwordHash: await hashPassword(next),
+      passwordChangedAt: new Date(),
+    })
     .where(eq(teachers.id, user.id));
+
+  // Zadrži trenutnu sesiju, a sve ostale uređaje odjavi.
+  await setSessionCookie(await createSessionToken(user));
 
   return { success: "Lozinka je promijenjena." };
 }

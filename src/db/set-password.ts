@@ -35,7 +35,10 @@ async function main() {
 
   await db
     .update(schema.teachers)
-    .set({ passwordHash: await hashPassword(password) })
+    .set({
+      passwordHash: await hashPassword(password),
+      passwordChangedAt: new Date(),
+    })
     .where(eq(schema.teachers.id, teacher.id));
 
   console.log(`Lozinka promijenjena za ${teacher.name} (${email}).`);

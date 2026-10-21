@@ -14,6 +14,7 @@ export const metadata: Metadata = {
   },
   description:
     "Nastavnik pripremi kratki test, učenici ga riješe na telefonu, a rezultati su odmah tu.",
+  robots: { index: false, follow: false },
 };
 
 export default function RootLayout({

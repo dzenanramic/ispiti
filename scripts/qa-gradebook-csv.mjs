@@ -1,0 +1,42 @@
+import { chromium } from 'playwright';
+const BASE = 'https://ispiti-eta.vercel.app';
+const adminClassId = '8cb1337e-d332-498a-b640-3046cebddf4d';
+const qaClassId = 'ef4406c3-13d6-4090-af8e-7fc2772a0de5';
+const browser = await chromium.launch({ channel: 'chrome', headless: true });
+
+const adminCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+const admin = await adminCtx.newPage();
+await admin.goto(`${BASE}/login`, { waitUntil: 'networkidle' });
+await admin.fill('#email', 'admin@ispiti.local');
+await admin.fill('#password', 'LX3aomU787JEgjXai3RV');
+await Promise.all([admin.waitForURL('**/teacher'), admin.click('button[type=submit]')]);
+await admin.goto(`${BASE}/teacher/classes/${adminClassId}/grades`, { waitUntil: 'networkidle' });
+await admin.waitForTimeout(700);
+const adminBody = await admin.locator('body').innerText();
+console.log('ADMIN GRADEBOOK HEADER', adminBody.split('\n').slice(0, 8).join(' | '));
+if (adminBody.includes('maksimum 5 bodova')) throw new Error('Lobby session still counted in gradebook');
+const adminCsv = await (await adminCtx.request.get(`${BASE}/api/classes/${adminClassId}/export`)).text();
+console.log('ADMIN CSV HEAD', adminCsv.slice(0, 200).replace(/\n/g, ' | '));
+if (adminCsv.includes('Test (')) throw new Error('Lobby session still in CSV');
+console.log('LOBBY EXCLUDED OK');
+await admin.screenshot({ path: '.qa/18-admin-gradebook-empty.png', fullPage: true });
+
+const qaCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+const qa = await qaCtx.newPage();
+await qa.goto(`${BASE}/login`, { waitUntil: 'networkidle' });
+await qa.fill('#email', 'qa.teacher@ispiti.local');
+await qa.fill('#password', 'QaTest12345!');
+await Promise.all([qa.waitForURL('**/teacher'), qa.click('button[type=submit]')]);
+await qa.goto(`${BASE}/teacher/classes/${qaClassId}`, { waitUntil: 'networkidle' });
+await qa.fill('#names', '=1+1');
+await qa.getByRole('button', { name: /Dodaj na spisak/ }).click();
+await qa.waitForTimeout(2500);
+const qaCsv = await (await qaCtx.request.get(`${BASE}/api/classes/${qaClassId}/export`)).text();
+const formulaLine = qaCsv.split('\n').find((l) => l.includes("'=1+1") || l.includes('"=1+1'));
+console.log('FORMULA LINE', formulaLine);
+if (!formulaLine || !formulaLine.includes("'=1+1")) throw new Error('CSV formula injection not prevented');
+console.log('CSV FORMULA INJECTION PREVENTED');
+await qa.screenshot({ path: '.qa/19-formula-student.png', fullPage: true });
+
+console.log('GRADEBOOK/CSV CHECKS DONE');
+await browser.close();

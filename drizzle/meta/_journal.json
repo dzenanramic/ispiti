@@ -15,6 +15,13 @@
       "when": 1792589949211,
       "tag": "0001_luxuriant_toro",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792607324327,
+      "tag": "0002_complex_marvex",
+      "breakpoints": true
     }
   ]
 }

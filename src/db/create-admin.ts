@@ -32,7 +32,12 @@ async function main() {
   if (existing) {
     await db
       .update(schema.teachers)
-      .set({ name, passwordHash, role: "admin" })
+      .set({
+        name,
+        passwordHash,
+        role: "admin",
+        passwordChangedAt: new Date(),
+      })
       .where(eq(schema.teachers.id, existing.id));
     console.log(`Admin nalog ažuriran: ${email}`);
   } else {

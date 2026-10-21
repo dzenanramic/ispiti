@@ -23,6 +23,7 @@ export type SessionUser = {
   email: string;
   name: string;
   role: "teacher" | "admin";
+  iat?: number;
 };
 
 export async function hashPassword(password: string): Promise<string> {
@@ -57,6 +58,7 @@ export async function verifySessionToken(token: string): Promise<SessionUser | n
       email: payload.email,
       name: payload.name,
       role: payload.role === "admin" ? "admin" : "teacher",
+      iat: typeof payload.iat === "number" ? payload.iat : undefined,
     };
   } catch {
     return null;
@@ -77,12 +79,17 @@ export async function getSession(): Promise<SessionUser | null> {
       email: teachers.email,
       name: teachers.name,
       role: teachers.role,
+      passwordChangedAt: teachers.passwordChangedAt,
     })
     .from(teachers)
     .where(eq(teachers.id, payload.id))
     .limit(1);
 
   if (!teacher) return null;
+
+  // Token izdat prije promjene lozinke više ne važi.
+  const issuedAtMs = typeof payload.iat === "number" ? payload.iat * 1000 : 0;
+  if (issuedAtMs + 1000 < teacher.passwordChangedAt.getTime()) return null;
 
   return {
     id: payload.id,

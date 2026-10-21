@@ -19,6 +19,9 @@ export const teachers = pgTable("teachers", {
   passwordHash: text("password_hash").notNull(),
   name: text("name").notNull(),
   role: text("role").notNull().default("teacher"), // teacher | admin
+  passwordChangedAt: timestamp("password_changed_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

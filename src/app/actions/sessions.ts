@@ -78,7 +78,7 @@ export async function createSessionAction(formData: FormData): Promise<void> {
     .values({
       quizId: quiz.id,
       classId: cls.id,
-      teacherId: user.id,
+      teacherId: cls.teacherId,
       code,
       durationSeconds,
       status: "lobby",

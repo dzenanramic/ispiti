@@ -1,0 +1,16 @@
+import { chromium } from 'playwright';
+const BASE = 'https://ispiti-eta.vercel.app';
+const classId = 'ef4406c3-13d6-4090-af8e-7fc2772a0de5';
+const browser = await chromium.launch({ channel: 'chrome', headless: true });
+const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+const page = await ctx.newPage();
+await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' });
+await page.fill('#email', 'qa.teacher@ispiti.local');
+await page.fill('#password', 'QaTest12345!');
+await Promise.all([page.waitForURL('**/teacher'), page.click('button[type=submit]')]);
+await page.goto(`${BASE}/teacher/classes/${classId}/grades`, { waitUntil: 'networkidle' });
+await page.waitForTimeout(1000);
+const row = page.locator('tbody tr').filter({ hasText: 'QA Amina Begić' });
+console.log('FRESH ROW', (await row.innerText()).replace(/\n/g, ' | '));
+await page.screenshot({ path: '.qa/12-grades.png', fullPage: true });
+await browser.close();
