@@ -6,7 +6,6 @@ import { logoutAction } from "@/app/actions/auth";
 import type { SessionUser } from "@/lib/auth";
 import { initials } from "@/lib/format";
 import { Brand } from "./Brand";
-import { NavigationProvider } from "./NavigationProgress";
 import { SidebarNav } from "./SidebarNav";
 
 export function AppShell({
@@ -20,7 +19,6 @@ export function AppShell({
   const pathname = usePathname();
 
   return (
-    <NavigationProvider>
     <div className="min-h-screen lg:grid lg:grid-cols-[260px_minmax(0,1fr)]">
       <aside className="sticky top-0 hidden h-screen flex-col border-r border-line bg-white/55 px-4 py-5 lg:flex">
         <div className="px-2">
@@ -82,6 +80,5 @@ export function AppShell({
         </main>
       </div>
     </div>
-    </NavigationProvider>
   );
 }
