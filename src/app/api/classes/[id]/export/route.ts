@@ -12,12 +12,8 @@ import {
 } from "@/db/schema";
 import { jsonError } from "@/lib/attempts";
 import { getSession } from "@/lib/auth";
-import { formatDate } from "@/lib/format";
-
-function cell(value: string | number | null | undefined): string {
-  const text = value === null || value === undefined ? "" : String(value);
-  return `"${text.replace(/"/g, '""')}"`;
-}
+import { csvCell } from "@/lib/csv";
+import { TERMS, formatDate } from "@/lib/format";
 
 export async function GET(
   _request: NextRequest,
@@ -59,7 +55,7 @@ export async function GET(
     })
     .from(sessions)
     .innerJoin(quizzes, eq(sessions.quizId, quizzes.id))
-    .where(eq(sessions.classId, cls.id))
+    .where(and(eq(sessions.classId, cls.id), eq(sessions.status, "closed")))
     .orderBy(sessions.createdAt);
 
   const quizIds = [...new Set(sessionRows.map((session) => session.quizId))];
@@ -115,7 +111,7 @@ export async function GET(
     "Ocjene",
   ];
 
-  const lines = [header.map(cell).join(";")];
+  const lines = [header.map(csvCell).join(";")];
 
   for (const student of studentRows) {
     const sessionCells = sessionRows.map((session) => {
@@ -132,9 +128,14 @@ export async function GET(
       .reduce((total, attempt) => total + attempt.score, 0);
 
     const studentGrades = gradeRows.filter((grade) => grade.studentId === student.id);
-    const gradesText = studentGrades
-      .map((grade) => `${grade.term}: ${grade.value}`)
-      .join(", ");
+    const gradesText = TERMS.map((term) => {
+      const values = studentGrades
+        .filter((grade) => grade.term === term)
+        .map((grade) => grade.value);
+      return values.length > 0 ? `${term}: ${values.join(", ")}` : null;
+    })
+      .filter(Boolean)
+      .join("; ");
 
     const percent =
       totalMax > 0 ? `${Math.round((totalScore / totalMax) * 100)}%` : "—";
@@ -148,7 +149,7 @@ export async function GET(
         percent,
         gradesText,
       ]
-        .map(cell)
+        .map(csvCell)
         .join(";"),
     );
   }

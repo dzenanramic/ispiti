@@ -65,7 +65,7 @@ export default async function GradesPage({
     })
     .from(sessions)
     .innerJoin(quizzes, eq(sessions.quizId, quizzes.id))
-    .where(eq(sessions.classId, cls.id))
+    .where(and(eq(sessions.classId, cls.id), eq(sessions.status, "closed")))
     .orderBy(sessions.createdAt);
 
   const quizIds = [...new Set(sessionRows.map((session) => session.quizId))];
@@ -115,7 +115,7 @@ export default async function GradesPage({
       <PageHeader
         eyebrow={cls.schoolYear}
         title={`Ocjene · ${cls.name}`}
-        description="Bodovi iz svih testova na jednom mjestu. Ti upisuješ ocjenu — aplikacija samo sabira."
+        description="Bodovi iz završenih testova na jednom mjestu. Ti upisuješ ocjenu — aplikacija samo sabira."
         actions={
           <a href={`/api/classes/${cls.id}/export`} className="btn btn-secondary">
             <Download className="h-4 w-4" />
