@@ -1,6 +1,9 @@
 import { cookies } from "next/headers";
 import { SignJWT, jwtVerify } from "jose";
 import bcrypt from "bcryptjs";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { teachers } from "@/db/schema";
 
 const COOKIE_NAME = "ispiti_session";
 const MAX_AGE = 60 * 60 * 24 * 7;
@@ -63,7 +66,30 @@ export async function verifySessionToken(token: string): Promise<SessionUser | n
 export async function getSession(): Promise<SessionUser | null> {
   const token = (await cookies()).get(COOKIE_NAME)?.value;
   if (!token) return null;
-  return verifySessionToken(token);
+
+  const payload = await verifySessionToken(token);
+  if (!payload) return null;
+
+  // Ime i uloga se čitaju iz baze, ne iz starog tokena — promjena imena
+  // ili role važi odmah, bez čekanja da sesija istekne.
+  const [teacher] = await db
+    .select({
+      email: teachers.email,
+      name: teachers.name,
+      role: teachers.role,
+    })
+    .from(teachers)
+    .where(eq(teachers.id, payload.id))
+    .limit(1);
+
+  if (!teacher) return null;
+
+  return {
+    id: payload.id,
+    email: teacher.email,
+    name: teacher.name,
+    role: teacher.role === "admin" ? "admin" : "teacher",
+  };
 }
 
 export async function setSessionCookie(token: string): Promise<void> {

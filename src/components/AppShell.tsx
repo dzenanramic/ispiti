@@ -1,17 +1,9 @@
 import { LogOut } from "lucide-react";
 import { logoutAction } from "@/app/actions/auth";
 import type { SessionUser } from "@/lib/auth";
+import { initials } from "@/lib/format";
 import { Brand } from "./Brand";
 import { SidebarNav } from "./SidebarNav";
-
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? "")
-    .join("");
-}
 
 export function AppShell({
   user,

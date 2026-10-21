@@ -4,7 +4,7 @@ import { ArrowRight, GraduationCap, ShieldCheck, Users } from "lucide-react";
 import { db } from "@/db";
 import { classes, sessions, students, teachers } from "@/db/schema";
 import { PageHeader, StatCard } from "@/components/ui";
-import { classWord, formatDate, testWord } from "@/lib/format";
+import { classWord, formatDate, initials, testWord } from "@/lib/format";
 import { requireAdmin } from "@/lib/guard";
 import { CreateTeacherForm } from "./CreateTeacherForm";
 
@@ -88,11 +88,7 @@ export default async function AdminPage() {
                   className="flex items-center gap-3 px-5 py-3.5"
                 >
                   <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand-soft text-xs font-bold text-brand-dark">
-                    {teacher.name
-                      .split(" ")
-                      .slice(0, 2)
-                      .map((part) => part[0]?.toUpperCase())
-                      .join("")}
+                    {initials(teacher.name)}
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{teacher.name}</p>

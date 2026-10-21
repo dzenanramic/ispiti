@@ -54,7 +54,7 @@ async function main() {
     .values({
       email: "profesor@ispiti.local",
       passwordHash: await hashPassword("profesor123"),
-      name: "Prof. Ahmed Hodžić",
+      name: "Prof. Ajdin Crnkić",
       role: "teacher",
     })
     .returning();
