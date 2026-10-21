@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { attempts, classes, quizzes, sessions, students } from "@/db/schema";
 import { jsonError } from "@/lib/attempts";
+import { isUniqueViolation } from "@/lib/db-errors";
 import { generateToken } from "@/lib/codes";
 
 const claimSchema = z.object({
@@ -161,8 +162,7 @@ export async function POST(
       status: "joined",
     });
   } catch (error) {
-    const dbCode = (error as { code?: string }).code;
-    if (dbCode === "23505") {
+    if (isUniqueViolation(error)) {
       const [retry] = await db
         .select({ token: attempts.token })
         .from(attempts)

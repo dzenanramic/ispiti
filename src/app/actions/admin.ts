@@ -5,6 +5,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { teachers } from "@/db/schema";
 import { hashPassword } from "@/lib/auth";
+import { isUniqueViolation } from "@/lib/db-errors";
 import { requireAdmin } from "@/lib/guard";
 
 const schema = z.object({
@@ -42,8 +43,7 @@ export async function createTeacherAction(
       role: "teacher",
     });
   } catch (error) {
-    const code = (error as { code?: string }).code;
-    if (code === "23505") {
+    if (isUniqueViolation(error)) {
       return { error: "Nastavnik sa tim emailom već postoji." };
     }
     return { error: "Nije moguće dodati nastavnika." };
