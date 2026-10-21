@@ -37,6 +37,20 @@ const TYPE_LABELS: Record<QuestionType, string> = {
 
 const LETTERS = ["A", "B", "C", "D", "E", "F", "G", "H"];
 
+// Primjer koji stoji u samom polju: pokazuje sva tri tipa pitanja.
+export const IMPORT_EXAMPLE = `1. Koji su osnovni dijelovi hadisa?
+A) Isnad i matn
+B) Sened i šerh
+C) Matn i tefsir
+Tačno: A
+
+2. Hadis je riječ, djelo ili odobrenje Poslanika.
+Tačno: T
+
+3. Lanac prenosilaca naziva se _____.
+Riječi: isnad, matn, šerh, tefsir
+Tačno: isnad`;
+
 function makeKey(): string {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
@@ -406,14 +420,35 @@ Riječi: isnad, matn, šerh, tefsir
 Tačno: isnad`}
           </pre>
 
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <label htmlFor="quiz-import" className="label !mb-0">
+              Pitanja
+            </label>
+            <button
+              type="button"
+              onClick={() => setImportText(IMPORT_EXAMPLE)}
+              className="link self-start sm:self-auto"
+            >
+              Upiši primjer u polje
+            </button>
+          </div>
+
           <textarea
+            id="quiz-import"
             value={importText}
             onChange={(event) => setImportText(event.target.value)}
-            rows={9}
-            className="textarea mt-3 font-mono text-xs"
-            placeholder="Zalijepi tekst ovdje…"
+            rows={10}
+            className="textarea mt-1.5 font-mono text-xs"
+            placeholder={IMPORT_EXAMPLE}
             dir="auto"
+            aria-describedby="quiz-import-help"
           />
+          <p id="quiz-import-help" className="mt-1.5 text-[0.72rem] leading-relaxed text-muted">
+            Svako pitanje počinje brojem. Ponudi opcije kao A), B), C) i napiši
+            red Tačno: A. Za pitanje tačno/netačno napiši Tačno: T ili Tačno: N.
+            Za dopunu stavi _____ u pitanje, navedi Riječi: a, b, c i napiši red
+            Tačno: a. Prazan red razdvaja pitanja.
+          </p>
 
           {importErrors.length > 0 ? (
             <ul className="mt-2 space-y-1 text-xs text-pencil">
