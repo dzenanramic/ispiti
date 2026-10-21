@@ -5,8 +5,8 @@ import {
   ArrowRight,
   BookOpen,
   CalendarClock,
-  ClipboardList,
   Plus,
+  Trophy,
   UserMinus,
   UserPlus,
   Users,
@@ -109,8 +109,8 @@ export default async function ClassPage({
         actions={
           <>
             <Link href={`/teacher/classes/${cls.id}/grades`} className="btn btn-secondary">
-              <ClipboardList className="h-4 w-4" />
-              Ocjene
+              <Trophy className="h-4 w-4" />
+              Uspjeh
             </Link>
             <Link href="/teacher/quizzes/new" className="btn btn-primary">
               <Plus className="h-4 w-4" />
@@ -128,7 +128,7 @@ export default async function ClassPage({
           href={`/teacher/classes/${cls.id}/grades`}
           className="px-3 py-2 text-muted transition-colors hover:text-ink"
         >
-          Ocjene
+          Uspjeh
         </Link>
       </div>
 
@@ -230,7 +230,7 @@ export default async function ClassPage({
           <div className="border-b border-line px-5 py-4">
             <h2 className="text-sm font-semibold">Testovi ovog odjeljenja</h2>
             <p className="text-xs text-muted">
-              Pet minuta po testu · bodovi se sabiraju u tabeli ocjena.
+              Pet minuta po testu · bodovi se sabiraju u pregledu uspjeha.
             </p>
           </div>
 

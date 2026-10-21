@@ -155,7 +155,7 @@ export default async function ResultsPage({
               href={`/teacher/classes/${session.classId}/grades`}
               className="btn btn-primary no-print"
             >
-              Ocjene
+              Uspjeh
             </Link>
           </>
         }
@@ -419,7 +419,7 @@ export default async function ResultsPage({
         ) : (
           <>
             <Check className="h-3.5 w-3.5" />
-            Rezultati su odmah dostupni u tabeli ocjena odjeljenja.
+            Rezultati su odmah dostupni u pregledu uspjeha odjeljenja.
           </>
         )}
       </p>

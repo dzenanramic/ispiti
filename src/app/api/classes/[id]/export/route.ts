@@ -4,7 +4,6 @@ import { db } from "@/db";
 import {
   attempts,
   classes,
-  grades,
   questions,
   quizzes,
   sessions,
@@ -13,7 +12,7 @@ import {
 import { jsonError } from "@/lib/attempts";
 import { getSession } from "@/lib/auth";
 import { csvCell } from "@/lib/csv";
-import { TERMS, formatDate } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 
 export async function GET(
   _request: NextRequest,
@@ -89,11 +88,6 @@ export async function GET(
           .where(inArray(attempts.sessionId, sessionIds))
       : [];
 
-  const gradeRows = await db
-    .select()
-    .from(grades)
-    .where(eq(grades.classId, cls.id));
-
   const gradedSessions = sessionRows.filter((session) =>
     attemptRows.some((attempt) => attempt.sessionId === session.id),
   );
@@ -112,7 +106,6 @@ export async function GET(
     "Ukupno",
     "Maksimum",
     "Procenat",
-    "Ocjene",
   ];
 
   const lines = [header.map(csvCell).join(";")];
@@ -131,16 +124,6 @@ export async function GET(
       .filter((attempt) => attempt.studentId === student.id)
       .reduce((total, attempt) => total + attempt.score, 0);
 
-    const studentGrades = gradeRows.filter((grade) => grade.studentId === student.id);
-    const gradesText = TERMS.map((term) => {
-      const values = studentGrades
-        .filter((grade) => grade.term === term)
-        .map((grade) => grade.value);
-      return values.length > 0 ? `${term}: ${values.join(", ")}` : null;
-    })
-      .filter(Boolean)
-      .join("; ");
-
     const percent =
       totalMax > 0 ? `${Math.round((totalScore / totalMax) * 100)}%` : "—";
 
@@ -151,7 +134,6 @@ export async function GET(
         totalScore,
         totalMax,
         percent,
-        gradesText,
       ]
         .map(csvCell)
         .join(";"),

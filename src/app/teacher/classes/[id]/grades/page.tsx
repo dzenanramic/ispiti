@@ -1,28 +1,37 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ClipboardList, Download, Plus, Users, X } from "lucide-react";
+import { Download, Percent, Target, Trophy, Users } from "lucide-react";
 import { db } from "@/db";
 import {
   attempts,
   classes,
-  grades,
   questions,
   quizzes,
   sessions,
   students,
   teachers,
 } from "@/db/schema";
-import { addGradeAction, deleteGradeAction } from "@/app/actions/classes";
-import { ConfirmSubmit } from "@/components/ConfirmSubmit";
-import { SubmitButton } from "@/components/SubmitButton";
-import { PageHeader } from "@/components/ui";
-import { TERMS, formatDate, percent, pointWord, testWord } from "@/lib/format";
+import { PageHeader, EmptyState } from "@/components/ui";
+import { formatDate, percent, pointWord, studentWord, testWord } from "@/lib/format";
 import { requireUser } from "@/lib/guard";
 
-export const metadata = { title: "Ocjene" };
+export const metadata = { title: "Uspjeh" };
 
-export default async function GradesPage({
+function successTone(pct: number): string {
+  if (pct >= 80) return "bg-emerald-600";
+  if (pct >= 60) return "bg-brand";
+  if (pct >= 40) return "bg-amber-500";
+  return "bg-danger";
+}
+
+function successTextTone(pct: number): string {
+  if (pct >= 60) return "text-brand-dark";
+  if (pct >= 40) return "text-amber-700";
+  return "text-danger";
+}
+
+export default async function SuccessPage({
   params,
 }: {
   params: Promise<{ id: string }>;
@@ -99,12 +108,6 @@ export default async function GradesPage({
           .where(inArray(attempts.sessionId, sessionIds))
       : [];
 
-  const gradeRows = await db
-    .select()
-    .from(grades)
-    .where(eq(grades.classId, cls.id))
-    .orderBy(desc(grades.createdAt));
-
   // Test koji nije imao nijedan pokušaj ne ulazi u tabelu — inače greškom
   // otvoren i zatvoren test podiže maksimum svima.
   const gradedSessions = sessionRows.filter((session) =>
@@ -116,12 +119,46 @@ export default async function GradesPage({
     0,
   );
 
+  const rows = studentRows.map((student) => {
+    let totalScore = 0;
+    let graded = 0;
+
+    const cells = gradedSessions.map((session) => {
+      const attempt = attemptRows.find(
+        (row) => row.sessionId === session.id && row.studentId === student.id,
+      );
+      const max = maxByQuiz.get(session.quizId) ?? 0;
+
+      if (!attempt) return { session, attempt: null, max };
+
+      totalScore += attempt.score;
+      if (attempt.status === "submitted") graded += 1;
+      return { session, attempt, max };
+    });
+
+    const pct = graded > 0 ? percent(totalScore, totalMax) : null;
+    return { student, cells, totalScore, graded, pct };
+  });
+
+  const withResults = rows.filter((row) => row.graded > 0);
+  const classAverage =
+    withResults.length > 0
+      ? Math.round(
+          withResults.reduce((total, row) => total + (row.pct ?? 0), 0) /
+            withResults.length,
+        )
+      : null;
+  const best =
+    withResults.length > 0
+      ? withResults.reduce((top, row) => ((row.pct ?? 0) > (top.pct ?? 0) ? row : top))
+      : null;
+
   return (
     <>
       <PageHeader
         eyebrow={cls.schoolYear}
-        title={`Ocjene · ${cls.name}`}
-        description="Bodovi iz završenih testova na jednom mjestu. Ti upisuješ ocjenu — aplikacija samo sabira."
+        title={cls.name}
+        description="Uspjeh učenika po završenim testovima — bodovi se sabiraju, bez ocjena."
         actions={
           <a href={`/api/classes/${cls.id}/export`} className="btn btn-secondary">
             <Download className="h-4 w-4" />
@@ -138,88 +175,88 @@ export default async function GradesPage({
           Učenici i testovi
         </Link>
         <span className="border-b-2 border-brand px-3 py-2 font-semibold text-brand">
-          Ocjene
+          Uspjeh
         </span>
       </div>
 
-      <form
-        action={addGradeAction}
-        className="card mb-5 grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_5.5rem_1fr_auto] lg:items-end"
-      >
-        <input type="hidden" name="classId" value={cls.id} />
-        <div>
-          <label htmlFor="studentId" className="label">
-            Učenik
-          </label>
-          <select id="studentId" name="studentId" required className="select">
-            {studentRows.map((student) => (
-              <option key={student.id} value={student.id}>
-                {student.name}
-              </option>
-            ))}
-          </select>
+      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="card p-4">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-muted">
+            Testova
+          </p>
+          <p className="mt-1 text-xl font-semibold tabular-nums">
+            {gradedSessions.length}
+            <span className="text-xs font-normal text-muted">
+              {" "}
+              · {totalMax} {pointWord(totalMax)}
+            </span>
+          </p>
         </div>
-        <div>
-          <label htmlFor="term" className="label">
-            Polugodište
-          </label>
-          <select id="term" name="term" className="select" defaultValue={TERMS[0]}>
-            {TERMS.map((term) => (
-              <option key={term} value={term}>
-                {term}
-              </option>
-            ))}
-          </select>
+        <div className="card p-4">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-muted">
+            Učenika
+          </p>
+          <p className="mt-1 text-xl font-semibold tabular-nums">
+            {studentRows.length}
+          </p>
+          <p className="mt-0.5 text-xs text-muted">
+            sa rezultatom {withResults.length}
+          </p>
         </div>
-        <div>
-          <label htmlFor="value" className="label">
-            Ocjena
-          </label>
-          <select id="value" name="value" className="select" defaultValue="4">
-            {[5, 4, 3, 2, 1].map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
+        <div className="card p-4">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-muted">
+            Prosjek odjeljenja
+          </p>
+          <p className="mt-1 text-xl font-semibold tabular-nums">
+            {classAverage === null ? "—" : `${classAverage}%`}
+          </p>
         </div>
-        <div>
-          <label htmlFor="note" className="label">
-            Napomena
-          </label>
-          <input
-            id="note"
-            name="note"
-            className="input"
-            placeholder="npr. usmeno ispitivanje"
-            maxLength={200}
-          />
+        <div className="card p-4">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-muted">
+            Najbolji rezultat
+          </p>
+          <p className="mt-1 truncate text-sm font-semibold">
+            {best ? best.student.name : "—"}
+          </p>
+          {best ? (
+            <p className="mt-0.5 text-xs text-muted">
+              {best.totalScore}/{totalMax} · {best.pct}%
+            </p>
+          ) : null}
         </div>
-        <SubmitButton pendingLabel="Upisujem…">
-          <Plus className="h-4 w-4" />
-          Upiši ocjenu
-        </SubmitButton>
-      </form>
+      </div>
 
       <div className="card overflow-hidden">
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
           <div>
-            <h2 className="text-sm font-semibold">Tabela bodova i ocjena</h2>
+            <h2 className="text-sm font-semibold">Uspjeh po testovima</h2>
             <p className="text-xs text-muted">
-              {gradedSessions.length} {testWord(gradedSessions.length)} · maksimum {totalMax}{" "}
-              {pointWord(totalMax)}
+              {gradedSessions.length} {testWord(gradedSessions.length)} ·{" "}
+              {studentRows.length} {studentWord(studentRows.length)}
             </p>
           </div>
-          <ClipboardList className="h-4 w-4 text-muted" />
+          <Target className="h-4 w-4 text-muted" />
         </div>
 
         {studentRows.length === 0 ? (
-          <div className="p-6 text-sm text-muted">
-            Nema učenika na spisku. Dodaj ih na stranici odjeljenja.
+          <div className="p-5">
+            <EmptyState
+              icon={Users}
+              title="Nema učenika na spisku"
+              description="Dodaj učenike na stranici odjeljenja, pa se vrati ovdje."
+            />
+          </div>
+        ) : gradedSessions.length === 0 ? (
+          <div className="p-5">
+            <EmptyState
+              icon={Trophy}
+              title="Još nema završenih testova"
+              description="Kada učenici riješe bar jedan test, ovdje se pojavi njihov uspjeh."
+            />
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[44rem] border-collapse text-sm">
+            <table className="w-full min-w-[36rem] border-collapse text-sm">
               <thead>
                 <tr className="border-b border-line bg-paper/60 text-left text-[11px] uppercase tracking-wide text-muted">
                   <th className="sticky left-0 z-10 bg-paper/95 px-4 py-2.5 font-bold">
@@ -236,63 +273,32 @@ export default async function GradesPage({
                     </th>
                   ))}
                   <th className="px-3 py-2.5 text-center font-bold">Ukupno</th>
-                  <th className="px-3 py-2.5 text-center font-bold">%</th>
-                  <th className="px-4 py-2.5 font-bold">Ocjene</th>
+                  <th className="px-3 py-2.5 font-bold">Uspjeh</th>
                 </tr>
               </thead>
               <tbody>
-                {studentRows.map((student) => {
-                  let totalScore = 0;
-                  let submittedCount = 0;
-                  const studentGrades = gradeRows.filter(
-                    (grade) => grade.studentId === student.id,
-                  );
+                {rows.map(({ student, cells, totalScore, pct }) => (
+                  <tr key={student.id} className="border-b border-line last:border-0">
+                    <td className="sticky left-0 z-10 bg-white px-4 py-3 font-medium">
+                      <span className="block max-w-[13rem] truncate">
+                        {student.name}
+                      </span>
+                    </td>
 
-                  return (
-                    <tr key={student.id} className="border-b border-line last:border-0">
-                      <td className="sticky left-0 z-10 bg-white px-4 py-3 font-medium">
-                        <span className="block max-w-[13rem] truncate">{student.name}</span>
-                      </td>
-                      {gradedSessions.map((session) => {
-                        const attempt = attemptRows.find(
-                          (row) =>
-                            row.sessionId === session.id && row.studentId === student.id,
+                    {cells.map(({ session, attempt, max }) => {
+                      if (!attempt) {
+                        return (
+                          <td
+                            key={session.id}
+                            className="px-3 py-3 text-center text-muted"
+                            title="Nije pristupio"
+                          >
+                            —
+                          </td>
                         );
-                        const max = maxByQuiz.get(session.quizId) ?? 0;
+                      }
 
-                        if (!attempt) {
-                          return (
-                            <td
-                              key={session.id}
-                              className="px-3 py-3 text-center text-muted"
-                              title="Nije pristupio"
-                            >
-                              —
-                            </td>
-                          );
-                        }
-
-                        if (attempt.status === "submitted") {
-                          totalScore += attempt.score;
-                          submittedCount += 1;
-                          const pct = percent(attempt.score, max);
-                          return (
-                            <td key={session.id} className="px-3 py-3 text-center">
-                              <span
-                                className={
-                                  pct >= 60
-                                    ? "font-semibold text-brand-dark"
-                                    : "font-semibold text-danger"
-                                }
-                              >
-                                {attempt.score}
-                              </span>
-                              <span className="text-xs text-muted">/{max}</span>
-                            </td>
-                          );
-                        }
-
-                        totalScore += attempt.score;
+                      if (attempt.status !== "submitted") {
                         return (
                           <td
                             key={session.id}
@@ -301,66 +307,55 @@ export default async function GradesPage({
                             u toku
                           </td>
                         );
-                      })}
-                      <td className="px-3 py-3 text-center font-semibold tabular-nums">
-                        {totalScore}
-                        <span className="text-xs font-normal text-muted">
-                          /{totalMax}
-                        </span>
-                      </td>
-                      <td className="px-3 py-3 text-center tabular-nums text-muted">
-                        {submittedCount > 0 ? `${percent(totalScore, totalMax)}%` : "—"}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-wrap items-center gap-1">
-                          {TERMS.map((term) => {
-                            const termGrades = studentGrades.filter(
-                              (grade) => grade.term === term,
-                            );
-                            if (termGrades.length === 0) return null;
-                            return (
-                              <span
-                                key={term}
-                                className="inline-flex items-center gap-1 rounded-full border border-line bg-paper px-1.5 py-0.5 text-[11px]"
-                                title={term}
-                              >
-                                <span className="text-muted">
-                                  {term.startsWith("1") ? "I" : "II"}:
-                                </span>
-                                {termGrades.map((grade) => (
-                                  <span key={grade.id} className="inline-flex items-center">
-                                    <span className="font-bold text-ink">{grade.value}</span>
-                                    <ConfirmSubmit
-                                      action={deleteGradeAction.bind(null, grade.id)}
-                                      message={`Obrisati ocjenu ${grade.value}?`}
-                                      className="ml-0.5 rounded p-0.5 text-muted hover:text-danger"
-                                      title="Obriši ocjenu"
-                                    >
-                                      <X className="h-2.5 w-2.5" />
-                                    </ConfirmSubmit>
-                                  </span>
-                                ))}
-                              </span>
-                            );
-                          })}
-                          {studentGrades.length === 0 ? (
-                            <span className="text-xs text-muted">—</span>
-                          ) : null}
+                      }
+
+                      const cellPct = percent(attempt.score, max);
+                      return (
+                        <td key={session.id} className="px-3 py-3 text-center">
+                          <span className={`font-semibold ${successTextTone(cellPct)}`}>
+                            {attempt.score}
+                          </span>
+                          <span className="text-xs text-muted">/{max}</span>
+                        </td>
+                      );
+                    })}
+
+                    <td className="px-3 py-3 text-center font-semibold tabular-nums">
+                      {totalScore}
+                      <span className="text-xs font-normal text-muted">
+                        /{totalMax}
+                      </span>
+                    </td>
+
+                    <td className="px-3 py-3">
+                      {pct === null ? (
+                        <span className="text-xs text-muted">—</span>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <div className="h-1.5 w-24 overflow-hidden rounded-full bg-line">
+                            <div
+                              className={`h-full rounded-full ${successTone(pct)}`}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          <span className="w-9 text-right text-xs font-semibold tabular-nums">
+                            {pct}%
+                          </span>
                         </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                      )}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
         )}
       </div>
 
-      <p className="mt-4 flex items-center gap-1.5 text-xs text-muted">
-        <Users className="h-3.5 w-3.5" />
-        Odsutni učenici nemaju unos u koloni testa. Aplikacija ne predlaže završnu
-        ocjenu — upisuješ je sam.
+      <p className="mt-4 flex items-start gap-1.5 text-xs leading-relaxed text-muted">
+        <Percent className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+        Odsutni učenici imaju „—“ u koloni testa i ne ulaze u prosjek. Ocjene se ne
+        unose ovdje — aplikacija samo sabira bodove, a ocjenu daješ ti.
       </p>
     </>
   );

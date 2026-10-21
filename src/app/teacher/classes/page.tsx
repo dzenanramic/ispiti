@@ -54,7 +54,7 @@ export default async function ClassesPage({
       <PageHeader
         eyebrow="Nastava"
         title="Odjeljenja"
-        description="Svako odjeljenje ima spisak učenika, svoje testove i svoju tabelu ocjena."
+        description="Svako odjeljenje ima spisak učenika, svoje testove i pregled uspjeha."
       />
 
       {error === "naziv" ? (
