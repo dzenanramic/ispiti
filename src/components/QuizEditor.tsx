@@ -7,7 +7,6 @@ import {
   AlertCircle,
   ArrowDown,
   ArrowUp,
-  FileText,
   Loader2,
   Play,
   Plus,
@@ -700,35 +699,28 @@ export function QuizEditor({
         </div>
       </div>
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setQuestions((current) => [...current, blankQuestion("single")])}
-          className="btn btn-secondary"
-        >
-          <Plus className="h-4 w-4" />
-          Dodaj pitanje
-        </button>
-        <button
-          type="button"
-          onClick={() => setImportOpen((open) => !open)}
-          className="btn btn-ghost"
-        >
-          <FileText className="h-4 w-4" />
-          Uvezi iz teksta
-        </button>
-        <span className="ml-auto hidden text-xs text-muted sm:block">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <p className="font-sans text-xs text-muted">
           Bodovi se sabiraju: 1 pitanje = 1 bod
-        </span>
+        </p>
+        {!aiEnabled ? (
+          <button
+            type="button"
+            onClick={() => setImportOpen((open) => !open)}
+            className="link"
+          >
+            {importOpen ? "Zatvori uvoz iz teksta" : "Uvezi pitanja iz teksta"}
+          </button>
+        ) : null}
       </div>
 
-      {importOpen ? (
-        <div className="card mb-5 border-forest/20 bg-forest-wash/30 p-4">
+      {!aiEnabled && importOpen ? (
+        <div className="mb-5 border border-rule bg-lift p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
               <h2 className="section-title">Uvoz pitanja iz teksta</h2>
-              <p className="mt-0.5 text-xs text-muted">
-                Zalijepi pitanja u šablonu ispod. Prazan red razdvaja pitanja.
+              <p className="mt-0.5 font-sans text-xs text-muted">
+                Prazan red razdvaja pitanja. Primjer šablona je ispod.
               </p>
             </div>
             <button
@@ -740,21 +732,6 @@ export function QuizEditor({
               <X className="h-4 w-4" />
             </button>
           </div>
-
-          <pre className="mt-3 overflow-x-auto rounded-sm border border-rule bg-lift p-3 text-[0.72rem] leading-relaxed text-muted">
-{`1. Koji su osnovni dijelovi hadisa?
-A) Isnad i matn
-B) Sened i šerh
-C) Matn i tefsir
-Tačno: A
-
-2. Hadis je riječ, djelo ili odobrenje Poslanika.
-Tačno: T
-
-3. Lanac prenosilaca naziva se _____.
-Riječi: isnad, matn, šerh, tefsir
-Tačno: isnad`}
-          </pre>
 
           <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <label htmlFor="quiz-import" className="label !mb-0">
@@ -773,28 +750,31 @@ Tačno: isnad`}
             id="quiz-import"
             value={importText}
             onChange={(event) => setImportText(event.target.value)}
-            rows={10}
+            rows={8}
             className="textarea mt-1.5 font-mono text-xs"
             placeholder={IMPORT_EXAMPLE}
             dir="auto"
             aria-describedby="quiz-import-help"
           />
-          <p id="quiz-import-help" className="mt-1.5 text-[0.72rem] leading-relaxed text-muted">
-            Svako pitanje počinje brojem. Ponudi opcije kao A), B), C) i napiši
-            red Tačno: A. Za pitanje tačno/netačno napiši Tačno: T ili Tačno: N.
-            Za dopunu stavi _____ u pitanje, navedi Riječi: a, b, c i napiši red
-            Tačno: a. Prazan red razdvaja pitanja.
+          <p
+            id="quiz-import-help"
+            className="mt-1.5 text-[0.72rem] leading-relaxed text-muted"
+          >
+            Svako pitanje počinje brojem. Opcije napiši kao A), B), C) i dodaj
+            red Tačno: A. Za tačno/netačno napiši Tačno: T ili Tačno: N. Za
+            dopunu stavi _____ u pitanje, navedi Riječi: a, b, c i napiši red
+            Tačno: a.
           </p>
 
           {importErrors.length > 0 ? (
-            <ul className="mt-2 space-y-1 text-xs text-pencil">
+            <ul className="mt-2 space-y-1 font-sans text-xs text-pencil">
               {importErrors.map((issue) => (
                 <li key={issue}>• {issue}</li>
               ))}
             </ul>
           ) : null}
           {importedCount !== null && importErrors.length === 0 ? (
-            <p className="mt-2 text-xs font-medium text-forest">
+            <p className="mt-2 font-sans text-xs text-forest">
               Uvezeno pitanja: {importedCount}.
             </p>
           ) : null}
