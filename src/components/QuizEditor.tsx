@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -12,12 +12,15 @@ import {
   Play,
   Plus,
   Save,
+  Sparkles,
   Trash2,
+  Upload,
   X,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { saveQuizAction } from "@/app/actions/quizzes";
 import { startQuizSessionAction } from "@/app/actions/sessions";
+import { generateQuizFromFileAction } from "@/app/actions/ai-import";
 import { parseQuestions } from "@/lib/parse-questions";
 import type { QuestionInput, QuestionType } from "@/lib/types";
 
@@ -92,11 +95,13 @@ export function QuizEditor({
   classes,
   initialClassId,
   initialError,
+  aiEnabled = true,
 }: {
   initial: InitialQuiz | null;
   classes: ClassOption[];
   initialClassId: string | null;
   initialError?: string | null;
+  aiEnabled?: boolean;
 }) {
   const router = useRouter();
   const [title, setTitle] = useState(initial?.title ?? "");
@@ -123,6 +128,12 @@ export function QuizEditor({
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [importedCount, setImportedCount] = useState<number | null>(null);
   const [saving, startSaving] = useTransition();
+  const [aiFile, setAiFile] = useState<File | null>(null);
+  const [aiText, setAiText] = useState("");
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiNotice, setAiNotice] = useState<string | null>(null);
+  const [aiPending, startAi] = useTransition();
+  const aiFileRef = useRef<HTMLInputElement>(null);
 
   function updateQuestion(index: number, next: EditorQuestion) {
     setQuestions((current) =>
@@ -320,6 +331,74 @@ export function QuizEditor({
     });
   }
 
+  function runAiImport() {
+    setAiError(null);
+    setAiNotice(null);
+
+    const formData = new FormData();
+    if (aiFile) formData.set("file", aiFile);
+    if (aiText.trim()) formData.set("text", aiText.trim());
+
+    if (!aiFile && !aiText.trim()) {
+      setAiError("Ubaci Word dokument ili zalijepi tekst pitanja.");
+      return;
+    }
+
+    const hasContent =
+      title.trim().length > 0 || questions.some((question) => question.prompt.trim());
+    if (
+      hasContent &&
+      !window.confirm(
+        "AI predlog će zamijeniti trenutni unos u editoru. Nastaviti?",
+      )
+    ) {
+      return;
+    }
+
+    startAi(async () => {
+      const result = await generateQuizFromFileAction(formData);
+      if (!result.ok) {
+        setAiError(result.error);
+        return;
+      }
+
+      setTitle(result.draft.title);
+      setLesson(result.draft.lesson);
+      setQuestions(
+        result.draft.questions.map((question, index) => ({
+          ...question,
+          key: `ai-${index}-${makeKey()}`,
+        })),
+      );
+      setError(null);
+      setImportOpen(false);
+
+      const parts = [
+        `AI je pripremio ${result.draft.questions.length} ${pluralBs(
+          result.draft.questions.length,
+          "pitanje",
+          "pitanja",
+          "pitanja",
+        )} iz „${result.meta.sourceName}“.`,
+      ];
+      if (result.meta.inferredAnswers > 0) {
+        parts.push(
+          `${result.meta.inferredAnswers} ${pluralBs(
+            result.meta.inferredAnswers,
+            "odgovor",
+            "odgovora",
+            "odgovora",
+          )} je AI predložio — provjeri ${result.meta.inferredAnswers === 1 ? "ga" : "ih"} prije čuvanja.`,
+        );
+      }
+      if (result.meta.truncated) {
+        parts.push("Dokument je skraćen na prvih 30.000 znakova.");
+      }
+      setAiNotice(parts.join(" "));
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  }
+
   const totalPoints = questions.length;
 
   return (
@@ -369,7 +448,7 @@ export function QuizEditor({
               <button
                 type="button"
                 onClick={() => save("save")}
-                disabled={saving}
+                disabled={saving || aiPending}
                 className="btn btn-secondary"
               >
                 {saving && pendingIntent === "save" ? (
@@ -382,7 +461,7 @@ export function QuizEditor({
               <button
                 type="button"
                 onClick={() => save("start")}
-                disabled={saving}
+                disabled={saving || aiPending}
                 className="btn btn-primary"
               >
                 {saving && pendingIntent === "start" ? (
@@ -398,6 +477,123 @@ export function QuizEditor({
           )}
         </div>
       </div>
+
+      {!initial ? (
+        aiEnabled ? (
+        <div className="mb-5 border border-rule bg-lift p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="section-title">Ubaci test — AI pripremi pitanja</h2>
+              <p className="mt-0.5 max-w-[62ch] font-sans text-xs leading-relaxed text-muted">
+                Ubaci Word dokument, .txt ili zalijepi tekst. AI predlaže 5
+                pitanja (do 10 ako ih dokument ima više) i tačne odgovore.
+                Ti ih pregledaš prije čuvanja.
+              </p>
+            </div>
+            <span className="badge border-forest/30 bg-forest-wash text-forest-deep">
+              <Sparkles className="h-3 w-3" />
+              AI predlog
+            </span>
+          </div>
+
+          <div className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+            <div>
+              <span className="label">Word dokument</span>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => aiFileRef.current?.click()}
+                  className="btn btn-secondary"
+                >
+                  <Upload className="h-4 w-4" />
+                  {aiFile ? "Drugi fajl" : "Izaberi fajl"}
+                </button>
+                <input
+                  ref={aiFileRef}
+                  type="file"
+                  accept=".docx,.txt,.md"
+                  className="sr-only"
+                  onChange={(event) =>
+                    setAiFile(event.target.files?.[0] ?? null)
+                  }
+                />
+                <span className="min-w-0 max-w-[16rem] truncate font-sans text-xs text-muted">
+                  {aiFile ? aiFile.name : ".docx, .txt ili .md"}
+                </span>
+                {aiFile ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAiFile(null);
+                      if (aiFileRef.current) aiFileRef.current.value = "";
+                    }}
+                    className="link"
+                  >
+                    Ukloni
+                  </button>
+                ) : null}
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="ai-text" className="label">
+                Ili zalijepi tekst
+              </label>
+              <textarea
+                id="ai-text"
+                value={aiText}
+                onChange={(event) => setAiText(event.target.value)}
+                rows={3}
+                className="textarea min-h-[4.5rem] text-xs"
+                placeholder="Zalijepi pitanja ili tekst lekcije…"
+              />
+            </div>
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+            <p className="max-w-[52ch] text-[0.72rem] leading-relaxed text-muted">
+              Ako dokument nema odgovore, AI ih predlaže i označava za
+              provjeru. Ništa se ne čuva dok ne pritisneš „Sačuvaj“. Dokument
+              se šalje AI servisu samo radi izrade predloga.
+            </p>
+            <button
+              type="button"
+              onClick={runAiImport}
+              disabled={aiPending}
+              className="btn btn-primary"
+            >
+              {aiPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4" />
+              )}
+              {aiPending ? "AI čita…" : "AI pripremi test"}
+            </button>
+          </div>
+
+          {aiError ? (
+            <p
+              role="alert"
+              className="mt-3 border-l-2 border-pencil bg-pencil-wash px-3 py-2 font-sans text-xs text-pencil"
+            >
+              {aiError}
+            </p>
+          ) : null}
+        </div>
+        ) : (
+          <div className="mb-5 border-l-2 border-rule bg-ink-wash px-4 py-3 font-sans text-sm leading-relaxed text-ink-soft">
+            AI uvoz nije podešen na serveru. Ručni unos i šablonski uvoz rade
+            normalno. Administrator može dodati <code>DEEPSEEK_API_KEY</code> u
+            Vercel.
+          </div>
+        )
+      ) : null}
+
+      {aiNotice ? (
+        <div className="mb-4 border-l-2 border-forest bg-forest-wash px-4 py-2.5 font-sans text-sm leading-relaxed text-forest-deep">
+          {aiNotice}
+        </div>
+      ) : null}
 
       {initial?.locked ? (
         <div className="mb-4 flex items-start gap-2 rounded-sm border border-rule bg-ink-wash px-3.5 py-2.5 text-sm text-ink-soft">
@@ -809,7 +1005,7 @@ Tačno: isnad`}
             <button
               type="button"
               onClick={() => save("save")}
-              disabled={saving}
+              disabled={saving || aiPending}
               className="btn btn-secondary"
             >
               {saving && pendingIntent === "save" ? (
@@ -822,7 +1018,7 @@ Tačno: isnad`}
             <button
               type="button"
               onClick={() => save("start")}
-              disabled={saving}
+              disabled={saving || aiPending}
               className="btn btn-primary"
             >
               {saving && pendingIntent === "start" ? (

@@ -5,6 +5,7 @@ import { QuizEditor } from "@/components/QuizEditor";
 import { requireUser } from "@/lib/guard";
 
 export const metadata = { title: "Novi kviz" };
+export const maxDuration = 60;
 
 export default async function NewQuizPage({
   searchParams,
@@ -29,6 +30,7 @@ export default async function NewQuizPage({
       initial={null}
       classes={classRows}
       initialClassId={initialClassId}
+      aiEnabled={Boolean(process.env.DEEPSEEK_API_KEY)}
     />
   );
 }

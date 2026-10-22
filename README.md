@@ -36,6 +36,7 @@ Bodovi iz svih testova se sabiraju u pregledu uspjeha odjeljenja. Ocjenu i dalje
   - jedan tačan odgovor,
   - dopuna iz ponuđenih riječi (word bank — učenik tapne riječ, ne kuca).
 - Uvoz pitanja iz teksta po šablonu (vidi ispod).
+- AI uvoz: nastavnik ubaci `.docx`, `.txt` ili zalijepi tekst, a AI predloži 5 pitanja (do 10 ako ih dokument ima više) i tačne odgovore. Predlog se uvijek otvara u editoru — nastavnik ga pregleda i tek onda čuva.
 - Kviz pripada jednom razredu; pokreće se samo u njemu. Za drugo odjeljenje duplikuj kviz i izmijeni pitanja.
 - „Sačuvaj i otvori test" odmah pravi lobby sesiju; ako razred već ima otvoren test, nudi se nastavak umjesto drugog koda.
 - Sesija: QR + 6-znakovni kod, lobby, sinhronizovani tajmer (3/5/6/10 min), zaključavanje ulaza, produženje vremena, poništavanje pokušaja, ručni upis rezultata za odsutne.
@@ -111,6 +112,22 @@ npm run dev
 ```
 
 Otvori <http://localhost:3000>.
+
+### AI uvoz
+
+U `.env.local` (i u Vercelu) postavi:
+
+```bash
+DEEPSEEK_API_KEY=...
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+DEEPSEEK_MODEL=deepseek-flash
+```
+
+Ako ključ nije postavljen, AI dugme prikaže poruku, a ručni unos i šablonski uvoz rade normalno. Dokument se šalje AI provajderu samo radi pravljenja predloga; ne čuva se na serveru.
+
+Na Vercelu: **Project → Settings → Environment Variables** dodaj
+`DEEPSEEK_API_KEY` (Production) i redeploy. Bez toga će AI uvoz na produkciji
+prikazati „AI uvoz nije podešen“, a sve ostalo radi.
 
 ### Demo nalozi
 
