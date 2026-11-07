@@ -16,6 +16,7 @@ import { PrintButton } from "@/components/PrintButton";
 import { Banner, PageHeader, StatRow } from "@/components/ui";
 import { formatDateTime, percent, pointWord } from "@/lib/format";
 import { requireUser } from "@/lib/guard";
+import type { QuestionPair } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -24,21 +25,55 @@ export const metadata = { title: "Rezultati" };
 const LETTERS = ["A", "B", "C", "D", "E", "F", "G", "H"];
 
 function answerLabel(
-  question: { type: string; options: string[] },
+  question: { type: string; options: string[]; pairs?: QuestionPair[] },
   value: unknown,
 ): string {
   if (value === null || value === undefined) return "—";
   if (question.type === "tf") return value === true ? "T" : "N";
+  if (question.type === "matching") {
+    if (!Array.isArray(value)) return "—";
+    const pairs = question.pairs ?? [];
+    const correct = pairs.filter((_, index) => value[index] === index).length;
+    return `${correct}/${pairs.length}`;
+  }
+  if (question.type === "cloze_multi") {
+    if (!Array.isArray(value)) return "—";
+    const filled = value.filter((index) => Number(index) >= 0).length;
+    return `${filled}/${value.length}`;
+  }
   const index = Number(value);
   return LETTERS[index] ?? "?";
 }
 
 function answerTitle(
-  question: { type: string; options: string[] },
+  question: { type: string; options: string[]; pairs?: QuestionPair[] },
   value: unknown,
 ): string {
   if (value === null || value === undefined) return "Bez odgovora";
   if (question.type === "tf") return value === true ? "Tačno" : "Netačno";
+  if (question.type === "matching") {
+    if (!Array.isArray(value)) return "Bez odgovora";
+    return (question.pairs ?? [])
+      .map((pair, index) => {
+        const chosen = value[index];
+        const picked =
+          typeof chosen === "number" && chosen >= 0
+            ? question.pairs?.[chosen]?.right ?? "—"
+            : "—";
+        const mark = chosen === index ? "✓" : "✗";
+        return `${index + 1}. ${mark} ${pair.left} → ${picked}`;
+      })
+      .join("  ·  ");
+  }
+  if (question.type === "cloze_multi") {
+    if (!Array.isArray(value)) return "Bez odgovora";
+    return value
+      .map((index, blankIndex) => {
+        const word = question.options[Number(index)] ?? "—";
+        return `${blankIndex + 1}. ${word}`;
+      })
+      .join("  ·  ");
+  }
   const index = Number(value);
   return question.options[index] ?? "";
 }
@@ -84,6 +119,7 @@ export default async function ResultsPage({
       options: questions.options,
       correct: questions.correct,
       points: questions.points,
+      pairs: questions.pairs,
     })
     .from(questions)
     .where(eq(questions.quizId, session.quizId))
@@ -102,6 +138,9 @@ export default async function ResultsPage({
       status: attempts.status,
       score: attempts.score,
       submittedAt: attempts.submittedAt,
+      leftAt: attempts.leftAt,
+      leaveCount: attempts.leaveCount,
+      submitReason: attempts.submitReason,
     })
     .from(attempts)
     .where(eq(attempts.sessionId, session.id));
@@ -186,6 +225,10 @@ export default async function ResultsPage({
             Zeleno = tačno, crveno = netačno. Pređi mišem preko slova za pun
             odgovor.
           </p>
+          <p className="mt-1 text-xs text-muted">
+            „Napustio test” znači da je učenik sakrio stranicu tokom rada. Ako
+            se vratio, test se predaje po povratku.
+          </p>
         </div>
 
         <div className="overflow-x-auto">
@@ -229,6 +272,21 @@ export default async function ResultsPage({
                         <span className="text-[10px] font-normal text-ink-soft">u toku</span>
                       ) : studentAnswers.length === 0 && attempt.score > 0 ? (
                         <span className="text-[10px] font-normal text-muted">ručno upisano</span>
+                      ) : null}
+                      {attempt && attempt.leaveCount > 0 ? (
+                        <span
+                          className="block text-[10px] font-normal text-pencil"
+                          title={
+                            attempt.leftAt
+                              ? `Zadnji put ${formatDateTime(attempt.leftAt)}`
+                              : undefined
+                          }
+                        >
+                          {attempt.submitReason === "left"
+                            ? "predao po povratku"
+                            : "napustio test"}{" "}
+                          ×{attempt.leaveCount}
+                        </span>
                       ) : null}
                     </td>
 
@@ -294,12 +352,18 @@ export default async function ResultsPage({
                   <td key={question.id} className="px-1.5 py-2.5 text-center">
                     <span
                       className="inline-flex items-center gap-0.5 font-bold text-forest-deep"
-                      title={answerTitle(question, question.correct)}
+                      title={
+                        question.type === "matching"
+                          ? "Svi parovi povezani tačno"
+                          : answerTitle(question, question.correct)
+                      }
                     >
                       {question.type === "tf" ? null : (
                         <Check className="h-3 w-3" />
                       )}
-                      {answerLabel(question, question.correct)}
+                      {question.type === "matching"
+                        ? `${question.pairs?.length ?? 0}/${question.pairs?.length ?? 0}`
+                        : answerLabel(question, question.correct)}
                     </span>
                   </td>
                 ))}

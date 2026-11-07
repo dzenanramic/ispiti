@@ -12,6 +12,7 @@ import {
 } from "@/db/schema";
 import { jsonError } from "@/lib/attempts";
 import { getSession } from "@/lib/auth";
+import { listClassDeviceBindings } from "@/lib/student-devices";
 
 export async function GET(
   _request: NextRequest,
@@ -68,6 +69,9 @@ export async function GET(
       score: attempts.score,
       joinedAt: attempts.joinedAt,
       submittedAt: attempts.submittedAt,
+      leftAt: attempts.leftAt,
+      leaveCount: attempts.leaveCount,
+      submitReason: attempts.submitReason,
     })
     .from(attempts)
     .where(eq(attempts.sessionId, session.id));
@@ -80,10 +84,16 @@ export async function GET(
             attemptId: answers.attemptId,
             questionId: answers.questionId,
             isCorrect: answers.isCorrect,
+            earnedPoints: answers.earnedPoints,
           })
           .from(answers)
           .where(inArray(answers.attemptId, attemptIds))
       : [];
+
+  const bindingRows = await listClassDeviceBindings(session.classId);
+  const bindingByStudent = new Map(
+    bindingRows.map((binding) => [binding.studentId, binding]),
+  );
 
   return Response.json({
     session: {
@@ -101,8 +111,13 @@ export async function GET(
     },
     students: studentRows.map((student) => {
       const attempt = attemptRows.find((row) => row.studentId === student.id);
+      const binding = bindingByStudent.get(student.id);
+      const device = {
+        deviceBound: Boolean(binding),
+        deviceIp: binding?.lastIpAddress ?? null,
+      };
       if (!attempt) {
-        return { id: student.id, name: student.name, attempt: null };
+        return { id: student.id, name: student.name, ...device, attempt: null };
       }
       const attemptAnswers = answerRows.filter(
         (answer) => answer.attemptId === attempt.id,
@@ -110,11 +125,12 @@ export async function GET(
       const liveScore =
         attempt.status === "submitted"
           ? attempt.score
-          : attemptAnswers.filter((answer) => answer.isCorrect).length;
+          : attemptAnswers.reduce((total, answer) => total + answer.earnedPoints, 0);
 
       return {
         id: student.id,
         name: student.name,
+        ...device,
         attempt: {
           id: attempt.id,
           status: attempt.status,
@@ -122,6 +138,9 @@ export async function GET(
           answered: attemptAnswers.length,
           joinedAt: attempt.joinedAt,
           submittedAt: attempt.submittedAt,
+          leftAt: attempt.leftAt,
+          leaveCount: attempt.leaveCount,
+          submitReason: attempt.submitReason,
         },
       };
     }),

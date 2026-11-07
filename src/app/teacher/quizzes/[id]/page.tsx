@@ -55,6 +55,7 @@ export default async function EditQuizPage({
           prompt: question.prompt,
           options: question.options,
           correct: question.correct,
+          pairs: question.pairs,
         })),
       }}
       classes={classRows}

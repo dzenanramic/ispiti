@@ -49,7 +49,7 @@ await teacher.waitForTimeout(800);
 await teacher.fill('#title', QUIZ_TITLE);
 await teacher.fill('#lesson', 'Lekcija 1 — provjera');
 await teacher.selectOption('#classId', { label: '3. razred' });
-await teacher.getByRole('button', { name: /Uvezi iz teksta/ }).click();
+await teacher.getByRole('button', { name: /Uvezi pitanja iz teksta/ }).click();
 const template = `1. Hadis je riječ, djelo ili odobrenje Poslanika.
 Tačno: T
 
@@ -99,6 +99,14 @@ await shot(teacher, '08-session-lobby');
 
 const joinUrl = await teacher.getByRole('link', { name: /Otvori/ }).first().getAttribute('href');
 console.log('JOIN URL', joinUrl);
+
+// Demo učenica može ostati trajno vezana za telefon iz prethodnog pokretanja.
+// Oslobodi je prije nego što novi browser context (novi device token) uđe.
+const releaseAmina = teacher.getByTitle(/Oslobodi uređaj — Amina Begić/);
+if (await releaseAmina.count()) {
+  await releaseAmina.first().click();
+  await teacher.waitForTimeout(1500);
+}
 
 // Student on phone
 const studentContext = await browser.newContext({

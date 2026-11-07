@@ -4,7 +4,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
-import { classes, grades, students } from "@/db/schema";
+import { classes, grades, studentDevices, students } from "@/db/schema";
 import { TERMS, currentSchoolYear } from "@/lib/format";
 import { requireUser } from "@/lib/guard";
 
@@ -122,7 +122,17 @@ export async function deactivateStudentAction(studentId: string): Promise<void> 
   if (!student) return;
   if (user.role !== "admin" && student.teacherId !== user.id) return;
 
-  await db.update(students).set({ active: false }).where(eq(students.id, studentId));
+  await db.transaction(async (tx) => {
+    await tx
+      .update(students)
+      .set({ active: false })
+      .where(eq(students.id, studentId));
+    // Neaktivnog učenika nema u spisku za ulazak, pa bi njegova veza samo
+    // blokirala telefon. Historija (pokušaji, ocjene) ostaje netaknuta.
+    await tx
+      .delete(studentDevices)
+      .where(eq(studentDevices.studentId, studentId));
+  });
   revalidatePath(`/teacher/classes/${student.classId}`);
 }
 

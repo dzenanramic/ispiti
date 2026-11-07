@@ -7,14 +7,28 @@ import { z } from "zod";
 import { db } from "@/db";
 import { classes, questions, quizzes, sessions } from "@/db/schema";
 import { requireUser } from "@/lib/guard";
+import { countBlanks } from "@/lib/parse-questions";
 import { createLobbySession } from "@/lib/session-create";
-import type { QuizSaveInput } from "@/lib/types";
+import type { QuizSaveInput, QuestionPair } from "@/lib/types";
 
 const questionSchema = z.object({
-  type: z.enum(["tf", "single", "cloze"]),
+  type: z.enum(["tf", "single", "cloze", "cloze_multi", "matching"]),
   prompt: z.string().trim().min(3, "Tekst pitanja je prekratak.").max(2000),
-  options: z.array(z.string().trim().min(1).max(200)).max(8),
-  correct: z.union([z.boolean(), z.number().int().min(0)]),
+  options: z.array(z.string().trim().min(1).max(200)).max(12),
+  correct: z.union([
+    z.boolean(),
+    z.number().int().min(0),
+    z.array(z.number().int().min(0)).max(12),
+  ]),
+  pairs: z
+    .array(
+      z.object({
+        left: z.string().trim().max(300),
+        right: z.string().trim().max(300),
+      }),
+    )
+    .max(8)
+    .optional(),
 });
 
 const quizSchema = z.object({
@@ -32,10 +46,12 @@ export type SaveQuizResult =
   | { ok: false; error: string };
 
 type CleanQuestion = {
-  type: "tf" | "single" | "cloze";
+  type: "tf" | "single" | "cloze" | "cloze_multi" | "matching";
   prompt: string;
   options: string[];
-  correct: boolean | number;
+  correct: boolean | number | number[];
+  pairs: QuestionPair[];
+  points: number;
 };
 
 function cleanQuestions(input: QuizSaveInput["questions"]): {
@@ -55,7 +71,48 @@ function cleanQuestions(input: QuizSaveInput["questions"]): {
       if (typeof raw.correct !== "boolean") {
         return { questions: [], error: `${label}: izaberi Tačno ili Netačno.` };
       }
-      cleaned.push({ type: "tf", prompt, options: [], correct: raw.correct });
+      cleaned.push({
+        type: "tf",
+        prompt,
+        options: [],
+        correct: raw.correct,
+        pairs: [],
+        points: 1,
+      });
+      continue;
+    }
+
+    if (raw.type === "matching") {
+      const pairs = (raw.pairs ?? []).map((pair) => ({
+        left: pair.left.trim(),
+        right: pair.right.trim(),
+      }));
+      if (pairs.length < 2) {
+        return { questions: [], error: `${label}: povezivanje traži najmanje dva para.` };
+      }
+      if (pairs.length > 8) {
+        return { questions: [], error: `${label}: najviše osam parova za povezivanje.` };
+      }
+      if (pairs.some((pair) => !pair.left || !pair.right)) {
+        return { questions: [], error: `${label}: popuni obje strane svakog para.` };
+      }
+      const lefts = new Set(pairs.map((pair) => pair.left.toLocaleLowerCase("bs")));
+      if (lefts.size !== pairs.length) {
+        return { questions: [], error: `${label}: dvije stavke s lijeve strane su iste.` };
+      }
+      const rights = new Set(pairs.map((pair) => pair.right.toLocaleLowerCase("bs")));
+      if (rights.size !== pairs.length) {
+        return { questions: [], error: `${label}: dvije stavke s desne strane su iste.` };
+      }
+      // Jedan bod po paru, pa se sabira sa ostalim pitanjima.
+      cleaned.push({
+        type: "matching",
+        prompt,
+        options: [],
+        correct: true,
+        pairs,
+        points: pairs.length,
+      });
       continue;
     }
 
@@ -63,13 +120,53 @@ function cleanQuestions(input: QuizSaveInput["questions"]): {
     if (options.length < 2) {
       return { questions: [], error: `${label}: potrebne su najmanje dvije opcije.` };
     }
-    if (options.length > 8) {
-      return { questions: [], error: `${label}: najviše osam opcija.` };
+    // Dozvoljeno isto što i u editoru i u AI uvozu: banka riječi za hadis
+    // (npr. 8 riječi) mora moći da se sačuva bez ručnog skraćivanja.
+    if (options.length > 12) {
+      return { questions: [], error: `${label}: najviše dvanaest opcija.` };
     }
     const unique = new Set(options.map((option) => option.toLocaleLowerCase("bs")));
     if (unique.size !== options.length) {
       return { questions: [], error: `${label}: opcije se ponavljaju.` };
     }
+
+    if (raw.type === "cloze_multi") {
+      const blanks = countBlanks(prompt);
+      if (blanks < 2) {
+        return {
+          questions: [],
+          error: `${label}: tekst hadisa treba najmanje dvije praznine (_____).`,
+        };
+      }
+      if (!Array.isArray(raw.correct)) {
+        return { questions: [], error: `${label}: nedostaje tačna riječ za praznine.` };
+      }
+      if (raw.correct.length !== blanks) {
+        return {
+          questions: [],
+          error: `${label}: ima ${blanks} praznina, a ${raw.correct.length} odgovora.`,
+        };
+      }
+      if (raw.correct.some((value) => value < 0 || value >= options.length)) {
+        return { questions: [], error: `${label}: tačan odgovor nije među riječima.` };
+      }
+      if (new Set(raw.correct).size !== raw.correct.length) {
+        return {
+          questions: [],
+          error: `${label}: ista riječ je tačna za dvije praznine.`,
+        };
+      }
+      cleaned.push({
+        type: "cloze_multi",
+        prompt,
+        options,
+        correct: [...raw.correct],
+        pairs: [],
+        points: 1,
+      });
+      continue;
+    }
+
     if (typeof raw.correct !== "number" || !Number.isInteger(raw.correct)) {
       return { questions: [], error: `${label}: označi tačan odgovor.` };
     }
@@ -77,7 +174,14 @@ function cleanQuestions(input: QuizSaveInput["questions"]): {
       return { questions: [], error: `${label}: tačan odgovor nije među opcijama.` };
     }
 
-    cleaned.push({ type: raw.type, prompt, options, correct: raw.correct });
+    cleaned.push({
+      type: raw.type,
+      prompt,
+      options,
+      correct: raw.correct,
+      pairs: [],
+      points: 1,
+    });
   }
 
   return { questions: cleaned };
@@ -174,6 +278,8 @@ export async function saveQuizAction(input: QuizSaveInput): Promise<SaveQuizResu
           prompt: question.prompt,
           options: question.options,
           correct: question.correct,
+          pairs: question.pairs,
+          points: question.points,
         })),
       );
     });
@@ -217,6 +323,8 @@ export async function saveQuizAction(input: QuizSaveInput): Promise<SaveQuizResu
         prompt: question.prompt,
         options: question.options,
         correct: question.correct,
+        pairs: question.pairs,
+        points: question.points,
       })),
     );
 
@@ -274,6 +382,7 @@ export async function duplicateQuizAction(quizId: string): Promise<void> {
           prompt: question.prompt,
           options: question.options,
           correct: question.correct,
+          pairs: question.pairs,
           points: question.points,
         })),
       );

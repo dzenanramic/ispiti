@@ -22,8 +22,10 @@ import {
   WifiOff,
 } from "lucide-react";
 import { clsx } from "clsx";
+import { MatchingPairs } from "@/components/MatchingPairs";
+import { MultiBlankHadith } from "@/components/MultiBlankHadith";
 import { formatDuration } from "@/lib/format";
-import { splitClozePrompt } from "@/lib/parse-questions";
+import { countBlanks, splitClozePrompt } from "@/lib/parse-questions";
 
 type Phase =
   | "loading"
@@ -34,7 +36,13 @@ type Phase =
   | "submitted"
   | "closed";
 
-type Student = { id: string; name: string; taken: boolean };
+type Student = {
+  id: string;
+  name: string;
+  taken: boolean;
+  /** Ime je već vezano za drugi uređaj u ovom odjeljenju. */
+  boundElsewhere: boolean;
+};
 
 type JoinResponse = {
   session: {
@@ -47,15 +55,19 @@ type JoinResponse = {
     endsAt: string | null;
     serverNow: number;
   };
+  deviceToken: string;
+  /** Učenik vezan za ovaj uređaj u odjeljenju, ako postoji. */
+  boundStudentId: string | null;
   students: Student[];
   me: { token: string; studentId: string; status: string } | null;
 };
 
 type AttemptQuestion = {
   id: string;
-  type: "tf" | "single" | "cloze";
+  type: "tf" | "single" | "cloze" | "cloze_multi" | "matching";
   prompt: string;
   options: string[];
+  pairs?: { left: string; right: string }[];
   position: number;
 };
 
@@ -69,10 +81,14 @@ type AttemptResponse = {
   serverNow?: number;
   durationSeconds?: number;
   questions?: AttemptQuestion[];
-  saved?: { questionId: string; value: boolean | number }[];
+  saved?: { questionId: string; value: AnswerValue }[];
+  submitReason?: string | null;
+  leaveCount?: number;
+  leftAt?: string | null;
 };
 
-type AnswerValue = boolean | number;
+type AnswerValue = boolean | number | number[];
+type SubmitReason = "student" | "time" | "left";
 
 const ARABIC_RE = /[\u0600-\u06FF]/;
 
@@ -86,6 +102,42 @@ function deviceStorageKey(): string {
 
 function attemptStorageKey(code: string): string {
   return `ispiti_attempt_${code}`;
+}
+
+/**
+ * Lokalna oznaka da je učenik napustio aktivan test. Preživi reload i
+ * zatvaranje taba, pa se test predaje kad se stranica ponovo otvori.
+ * Server ima i `leave_count` kao rezervu.
+ */
+function leftStorageKey(token: string): string {
+  return `ispiti_left_${token}`;
+}
+
+function markLeft(token: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(leftStorageKey(token), String(Date.now()));
+  } catch {
+    // Privatni režim — server i dalje beleži napuštanje.
+  }
+}
+
+function hasLeft(token: string): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(leftStorageKey(token)) !== null;
+  } catch {
+    return false;
+  }
+}
+
+function clearLeft(token: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(leftStorageKey(token));
+  } catch {
+    // ignore
+  }
 }
 
 type LocalAnswerStore = {
@@ -155,6 +207,8 @@ function readDeviceToken(): string | null {
 
 function typeLabel(type: AttemptQuestion["type"]): string {
   if (type === "tf") return "Tačno / netačno";
+  if (type === "cloze_multi") return "Popuni hadiš";
+  if (type === "matching") return "Poveži parove";
   if (type === "cloze") return "Dopuni";
   return "Jedan odgovor";
 }
@@ -164,7 +218,7 @@ export function StudentApp({ code }: { code: string }) {
   const [join, setJoin] = useState<JoinResponse | null>(null);
   const [attempt, setAttempt] = useState<AttemptResponse | null>(null);
   const [answers, setAnswers] = useState<Record<string, AnswerValue>>({});
-  const [deviceToken] = useState<string | null>(() =>
+  const [deviceToken, setDeviceToken] = useState<string | null>(() =>
     typeof window === "undefined" ? null : readDeviceToken(),
   );
   const [attemptToken, setAttemptToken] = useState<string | null>(() =>
@@ -177,6 +231,7 @@ export function StudentApp({ code }: { code: string }) {
   const [error, setError] = useState<string | null>(null);
   const [claiming, setClaiming] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [submittedReason, setSubmittedReason] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">(
     "idle",
   );
@@ -193,15 +248,29 @@ export function StudentApp({ code }: { code: string }) {
   const hydratedTokenRef = useRef<string | null>(null);
   const submittingRef = useRef(false);
   const phaseRef = useRef<Phase>("loading");
+  const leftRef = useRef(false);
+  const autoSubmitTriedRef = useRef<string | null>(null);
 
   useEffect(() => {
     phaseRef.current = phase;
   }, [phase]);
 
   const questions = attempt?.questions ?? [];
-  const answeredCount = questions.filter((question) =>
-    Object.prototype.hasOwnProperty.call(answers, question.id),
-  ).length;
+  const serverLeaveCount = attempt?.leaveCount ?? 0;
+  const isAnswered = (question: AttemptQuestion): boolean => {
+    if (!Object.prototype.hasOwnProperty.call(answers, question.id)) return false;
+    const value = answers[question.id];
+    if (question.type === "matching") {
+      const count = (question.pairs ?? []).length;
+      if (!Array.isArray(value) || count === 0) return false;
+      return value.length >= count && value.slice(0, count).every((i) => i >= 0);
+    }
+    if (question.type !== "cloze_multi") return true;
+    const blanks = countBlanks(question.prompt);
+    if (!Array.isArray(value) || blanks === 0) return Array.isArray(value);
+    return value.length >= blanks && value.slice(0, blanks).every((i) => i >= 0);
+  };
+  const answeredCount = questions.filter(isAnswered).length;
 
   const remainingMs = deadline
     ? Math.max(0, deadline - (now + clockOffset))
@@ -244,10 +313,13 @@ export function StudentApp({ code }: { code: string }) {
   const loadAttempt = useCallback(
     async (token: string) => {
       try {
-        const response = await fetch(`/api/attempt/${token}`, { cache: "no-store" });
+        const response = await fetch(`/api/attempt/${token}`, {
+          cache: "no-store",
+        });
         if (response.status === 404) {
           window.localStorage.removeItem(attemptStorageKey(code));
           clearLocalAnswers(token);
+          clearLeft(token);
           hydratedTokenRef.current = null;
           failedAnswers.current.clear();
           pendingLocal.current.clear();
@@ -264,6 +336,8 @@ export function StudentApp({ code }: { code: string }) {
           submittedRef.current = true;
           hydratedTokenRef.current = token;
           clearLocalAnswers(token);
+          clearLeft(token);
+          setSubmittedReason(data.submitReason ?? null);
           setAttempt(data);
           setPhase("submitted");
           return;
@@ -271,6 +345,7 @@ export function StudentApp({ code }: { code: string }) {
         if (data.status === "closed") {
           hydratedTokenRef.current = token;
           clearLocalAnswers(token);
+          clearLeft(token);
           setPhase("closed");
           return;
         }
@@ -282,6 +357,7 @@ export function StudentApp({ code }: { code: string }) {
 
         setClockOffset((data.serverNow ?? Date.now()) - Date.now());
         setDeadline(data.endsAt ? new Date(data.endsAt).getTime() : null);
+        setSubmittedReason(null);
         setAttempt(data);
 
         if (hydratedTokenRef.current !== token) {
@@ -328,6 +404,12 @@ export function StudentApp({ code }: { code: string }) {
           }
         }
 
+        // Server je zabeležio napuštanje (npr. beacon je stigao, a lokalna
+        // oznaka je obrisana) — povratak mora predati test.
+        if ((data.leaveCount ?? 0) > 0 && !submittedRef.current) {
+          leftRef.current = true;
+        }
+
         setPhase("active");
       } catch {
         setError("Veza je prekinuta. Provjeri internet i pokušaj ponovo.");
@@ -338,18 +420,27 @@ export function StudentApp({ code }: { code: string }) {
   );
 
   const refreshJoin = useCallback(async () => {
-    if (!deviceToken) return;
     try {
-      const response = await fetch(
-        `/api/join/${code}?device=${encodeURIComponent(deviceToken)}`,
-        { cache: "no-store" },
-      );
+      const query = deviceToken
+        ? `?device=${encodeURIComponent(deviceToken)}`
+        : "";
+      const response = await fetch(`/api/join/${code}${query}`, {
+        cache: "no-store",
+      });
       if (response.status === 404) {
         setError("Test sa tim kodom ne postoji. Provjeri kod kod nastavnika.");
         setPhase("error");
         return;
       }
       const data = (await response.json()) as JoinResponse;
+
+      // Server može vratiti token iz HttpOnly kolačića (npr. kad je
+      // localStorage obrisan) — tada i localStorage držimo u istom stanju.
+      if (data.deviceToken && data.deviceToken !== deviceToken) {
+        window.localStorage.setItem(deviceStorageKey(), data.deviceToken);
+        setDeviceToken(data.deviceToken);
+      }
+
       setJoin(data);
       setError(null);
 
@@ -380,7 +471,6 @@ export function StudentApp({ code }: { code: string }) {
 
   // Prvo učitavanje i ulazak u sesiju.
   useEffect(() => {
-    if (!deviceToken) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- učitavanje sa servera
     void refreshJoin();
   }, [deviceToken, refreshJoin]);
@@ -412,6 +502,13 @@ export function StudentApp({ code }: { code: string }) {
       const now = Date.now();
       for (let index = window.localStorage.length - 1; index >= 0; index -= 1) {
         const key = window.localStorage.key(index);
+        if (key?.startsWith("ispiti_left_")) {
+          const timestamp = Number(window.localStorage.getItem(key));
+          if (!timestamp || now - timestamp > 24 * 60 * 60 * 1000) {
+            window.localStorage.removeItem(key);
+          }
+          continue;
+        }
         if (!key?.startsWith("ispiti_answers_")) continue;
         const raw = window.localStorage.getItem(key);
         if (!raw) continue;
@@ -441,7 +538,6 @@ export function StudentApp({ code }: { code: string }) {
   }, [attemptToken, retrySaves]);
 
   async function claim(student: Student) {
-    if (!deviceToken) return;
     setClaiming(true);
     setError(null);
 
@@ -449,15 +545,27 @@ export function StudentApp({ code }: { code: string }) {
       const response = await fetch(`/api/join/${code}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ studentId: student.id, deviceToken }),
+        body: JSON.stringify({
+          studentId: student.id,
+          ...(deviceToken ? { deviceToken } : {}),
+        }),
       });
-      const data = (await response.json()) as { token?: string; error?: string };
+      const data = (await response.json()) as {
+        token?: string;
+        deviceToken?: string;
+        error?: string;
+      };
 
       if (!response.ok || !data.token) {
         setError(data.error ?? "Nije moguće ući u test.");
         setSelected(null);
         await refreshJoin();
         return;
+      }
+
+      if (data.deviceToken && data.deviceToken !== deviceToken) {
+        window.localStorage.setItem(deviceStorageKey(), data.deviceToken);
+        setDeviceToken(data.deviceToken);
       }
 
       window.localStorage.setItem(attemptStorageKey(code), data.token);
@@ -467,6 +575,9 @@ export function StudentApp({ code }: { code: string }) {
       answersRef.current = {};
       submittedRef.current = false;
       submittingRef.current = false;
+      leftRef.current = false;
+      autoSubmitTriedRef.current = null;
+      setSubmittedReason(null);
       setAnswers({});
       setAttemptToken(data.token);
       setSelected(null);
@@ -522,18 +633,26 @@ export function StudentApp({ code }: { code: string }) {
   }
 
   const submit = useCallback(
-    async (auto: boolean) => {
-      if (!attemptToken || submittingRef.current || submittedRef.current) return;
+    async (
+      auto: boolean,
+      reason: SubmitReason = "student",
+    ): Promise<boolean> => {
+      if (!attemptToken || submittingRef.current || submittedRef.current) {
+        return submittedRef.current;
+      }
 
       if (!auto) {
         const unanswered = questions.length - answeredCount;
-        if (
-          unanswered > 0 &&
-          !window.confirm(
+        if (unanswered > 0) {
+          // Native confirm ne smije biti protumačen kao napuštanje testa.
+          submittingRef.current = true;
+          const confirmed = window.confirm(
             `Imaš ${unanswered} neodgovorenih pitanja. Predati test ipak?`,
-          )
-        ) {
-          return;
+          );
+          if (!confirmed) {
+            submittingRef.current = false;
+            return false;
+          }
         }
       }
 
@@ -554,22 +673,32 @@ export function StudentApp({ code }: { code: string }) {
           );
           submittingRef.current = false;
           setSubmitting(false);
-          return;
+          return false;
         }
 
         submittedRef.current = true;
         const response = await fetch(`/api/attempt/${attemptToken}/submit`, {
           method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reason }),
         });
+        const data = (await response.json().catch(() => null)) as {
+          ok?: boolean;
+          reason?: string;
+        } | null;
         if (!response.ok) throw new Error("submit");
         pendingLocal.current.clear();
         clearLocalAnswers(attemptToken);
+        clearLeft(attemptToken);
+        setSubmittedReason(data?.reason ?? reason);
         setPhase("submitted");
+        return true;
       } catch {
         submittedRef.current = false;
         submittingRef.current = false;
         setError("Predaja nije uspjela. Provjeri internet i pokušaj ponovo.");
         setSubmitting(false);
+        return false;
       }
     },
     [attemptToken, questions.length, answeredCount, retrySaves],
@@ -579,9 +708,108 @@ export function StudentApp({ code }: { code: string }) {
   useEffect(() => {
     if (phase !== "active" || remainingMs === null) return;
     if (remainingMs <= 0 && !submittedRef.current) {
-      void submit(true);
+      void submit(true, "time");
     }
   }, [phase, remainingMs, submit]);
+
+  // Ako je prethodni posjet ostavio oznaku napuštanja (ili je server
+  // zabeležio leave_count), predaj odmah po povratku — uključujući reload
+  // ili ponovno otvaranje taba.
+  useEffect(() => {
+    if (phase !== "active" || !attemptToken || submittedRef.current) return;
+    if (
+      typeof document === "undefined" ||
+      document.visibilityState !== "visible"
+    ) {
+      return;
+    }
+    if (!hasLeft(attemptToken) && serverLeaveCount === 0) return;
+    if (autoSubmitTriedRef.current === attemptToken) return;
+
+    autoSubmitTriedRef.current = attemptToken;
+    leftRef.current = true;
+    void submit(true, "left");
+  }, [phase, attemptToken, serverLeaveCount, submit]);
+
+  // Spreči slučajni pull-to-refresh tokom testa — reload bi se računao kao
+  // vraćanje i predao test. Najbolje što preglednik dopušta; stariji iOS
+  // može i dalje dozvoliti gest.
+  useEffect(() => {
+    if (phase !== "active") return;
+    const root = document.documentElement;
+    const body = document.body;
+    const previousRoot = root.style.overscrollBehaviorY;
+    const previousBody = body.style.overscrollBehaviorY;
+    root.style.overscrollBehaviorY = "contain";
+    body.style.overscrollBehaviorY = "contain";
+    return () => {
+      root.style.overscrollBehaviorY = previousRoot;
+      body.style.overscrollBehaviorY = previousBody;
+    };
+  }, [phase]);
+
+  // Napuštanje aktivnog testa: zapamti lokalno i pošalji beacon. Predaja
+  // ide tek kad se stranica vrati, ne dok je sakrivena — tako kratak poziv
+  // ili poruka ne unište test, ali učenik ne može odgovoriti poslije
+  // vraćanja.
+  useEffect(() => {
+    if (phase !== "active" || !attemptToken) return;
+
+    const noteLeave = () => {
+      if (submittedRef.current || submittingRef.current || leftRef.current) {
+        return;
+      }
+      leftRef.current = true;
+      markLeft(attemptToken);
+
+      try {
+        if (typeof navigator !== "undefined" && navigator.sendBeacon) {
+          navigator.sendBeacon(`/api/attempt/${attemptToken}/leave`);
+        } else {
+          void fetch(`/api/attempt/${attemptToken}/leave`, {
+            method: "POST",
+            keepalive: true,
+          });
+        }
+      } catch {
+        // Server ima i leave_count; lokalna oznaka je dovoljna za predaju.
+      }
+    };
+
+    const noteReturn = () => {
+      if (!leftRef.current) return;
+      leftRef.current = false;
+      if (submittedRef.current) return;
+
+      void submit(true, "left").then((ok) => {
+        if (!ok && !submittedRef.current) leftRef.current = true;
+      });
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") noteLeave();
+      else noteReturn();
+    };
+    const onPageHide = () => noteLeave();
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) noteReturn();
+    };
+    const onFocus = () => {
+      if (document.visibilityState === "visible") noteReturn();
+    };
+
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", onPageHide);
+    window.addEventListener("pageshow", onPageShow);
+    window.addEventListener("focus", onFocus);
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", onPageHide);
+      window.removeEventListener("pageshow", onPageShow);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [phase, attemptToken, submit]);
 
   const filteredStudents = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase("bs");
@@ -590,6 +818,15 @@ export function StudentApp({ code }: { code: string }) {
       student.name.toLocaleLowerCase("bs").includes(needle),
     );
   }, [join?.students, query]);
+
+  // Kad je telefon već vezan za učenika, ne nudi ostala imena — to je cijela
+  // poenta trajne veze. Nastavnik može osloboditi uređaj ako je greška.
+  const boundStudent = join?.boundStudentId
+    ? (join.students.find((student) => student.id === join.boundStudentId) ??
+      null)
+    : null;
+
+  const visibleStudents = boundStudent ? [boundStudent] : filteredStudents;
 
   return (
     <div className="flex min-h-dvh flex-col bg-paper">
@@ -659,6 +896,20 @@ export function StudentApp({ code }: { code: string }) {
               <br />
               Možeš zatvoriti stranicu.
             </p>
+            {submittedReason === "left" ? (
+              <p className="mx-auto mt-3 max-w-xs text-xs leading-relaxed text-pencil">
+                Test je predan jer si napustio stranicu. Ako je to bila greška,
+                javi se nastavniku.
+              </p>
+            ) : submittedReason === "time" ? (
+              <p className="mx-auto mt-3 max-w-xs text-xs leading-relaxed text-muted">
+                Vrijeme je isteklo, pa je test predan automatski.
+              </p>
+            ) : submittedReason === "closed" ? (
+              <p className="mx-auto mt-3 max-w-xs text-xs leading-relaxed text-muted">
+                Nastavnik je završio test.
+              </p>
+            ) : null}
             {attempt?.studentName ? (
               <p className="mt-4 text-xs text-muted">{attempt.studentName}</p>
             ) : null}
@@ -674,8 +925,28 @@ export function StudentApp({ code }: { code: string }) {
               <h1 className="mt-1 text-xl font-semibold tracking-tight">
                 {join.session.quizTitle}
               </h1>
-              <p className="mt-1 text-sm text-muted">Izaberi svoje ime sa spiska.</p>
+              <p className="mt-1 text-sm text-muted">
+                {boundStudent
+                  ? "Ovaj telefon je vezan za tvoje ime."
+                  : "Izaberi svoje ime sa spiska."}
+              </p>
             </div>
+
+            {boundStudent ? (
+              <div className="mt-4 rounded-sm border border-forest/30 bg-forest-wash px-3 py-2.5 text-forest-deep">
+                <p className="font-sans text-[0.7rem] text-forest">
+                  Ime na ovom telefonu
+                </p>
+                <p className="mt-0.5 text-base font-semibold">
+                  {boundStudent.name}
+                </p>
+                <p className="mt-1 text-[0.72rem] leading-relaxed text-forest-deep/80">
+                  Ime je trajno vezano za ovaj telefon u ovom odjeljenju. Ako
+                  ovo nije tvoje ime, javi nastavniku — samo on može osloboditi
+                  uređaj.
+                </p>
+              </div>
+            ) : null}
 
             {join.session.status === "active" ? (
               <div className="mt-4 flex items-start gap-2 rounded-sm border border-rule bg-ink-wash px-3 py-2 text-xs text-ink-soft">
@@ -691,7 +962,7 @@ export function StudentApp({ code }: { code: string }) {
               </div>
             ) : null}
 
-            {(join.students?.length ?? 0) > 10 ? (
+            {!boundStudent && (join.students?.length ?? 0) > 10 ? (
               <div className="relative mt-4">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
                 <input
@@ -705,40 +976,57 @@ export function StudentApp({ code }: { code: string }) {
             ) : null}
 
             <div className="mt-4 grid grid-cols-2 gap-2">
-              {filteredStudents.map((student) => (
-                <button
-                  key={student.id}
-                  type="button"
-                  disabled={student.taken || claiming}
-                  onClick={() => setSelected(student)}
-                  className={clsx(
-                    "flex min-h-11 items-center justify-between gap-2 rounded-sm border px-3 py-2.5 text-left text-sm transition-colors",
-                    student.taken
-                      ? "cursor-not-allowed border-rule bg-paper text-muted opacity-70"
-                      : "border-rule bg-lift font-medium hover:border-forest/40 hover:bg-forest-wash/30",
-                  )}
-                >
-                  <span className="min-w-0 truncate">{student.name}</span>
-                  {student.taken ? (
-                    <span className="shrink-0 font-sans text-[0.65rem] text-muted">
-                      zauzeto
-                    </span>
-                  ) : (
-                    <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted" />
-                  )}
-                </button>
-              ))}
+              {visibleStudents.map((student) => {
+                const locked = student.taken || student.boundElsewhere;
+                return (
+                  <button
+                    key={student.id}
+                    type="button"
+                    disabled={locked || claiming}
+                    onClick={() => setSelected(student)}
+                    className={clsx(
+                      "flex min-h-11 items-center justify-between gap-2 rounded-sm border px-3 py-2.5 text-left text-sm transition-colors",
+                      locked
+                        ? "cursor-not-allowed border-rule bg-paper text-muted opacity-70"
+                        : "border-rule bg-lift font-medium hover:border-forest/40 hover:bg-forest-wash/30",
+                    )}
+                  >
+                    <span className="min-w-0 truncate">{student.name}</span>
+                    {student.taken ? (
+                      <span className="shrink-0 font-sans text-[0.65rem] text-muted">
+                        zauzeto
+                      </span>
+                    ) : student.boundElsewhere ? (
+                      <span className="shrink-0 font-sans text-[0.65rem] text-muted">
+                        vezano
+                      </span>
+                    ) : (
+                      <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted" />
+                    )}
+                  </button>
+                );
+              })}
             </div>
 
-            {filteredStudents.length === 0 ? (
+            {visibleStudents.length === 0 ? (
               <p className="mt-4 text-center text-sm text-muted">
-                Nema imena koja odgovaraju pretrazi.
+                {boundStudent
+                  ? "Tvoje ime više nije na spisku. Javi se nastavniku."
+                  : "Nema imena koja odgovaraju pretrazi."}
+              </p>
+            ) : null}
+
+            {boundStudent?.taken ? (
+              <p className="mt-3 text-center text-[0.72rem] leading-relaxed text-pencil">
+                Ovo ime je već prijavljeno u ovom testu sa drugog uređaja. Javi
+                se nastavniku.
               </p>
             ) : null}
 
             <p className="mt-5 text-center text-[0.72rem] leading-relaxed text-muted">
-              Ime se veže za ovaj telefon za vrijeme testa i ne može se mijenjati.
-              Ako pogriješiš, javi nastavniku.
+              {boundStudent
+                ? "Ako promijeniš telefon ili obrišeš podatke preglednika, javi se nastavniku da oslobodi uređaj."
+                : "Prvi izbor imena veže ovaj telefon za to ime u cijelom odjeljenju. U sljedećem testu ne možeš izabrati drugo ime. Ako pogriješiš, javi nastavniku."}
             </p>
           </div>
         ) : null}
@@ -765,6 +1053,10 @@ export function StudentApp({ code }: { code: string }) {
             </div>
             <p className="mt-4 text-[0.72rem] text-muted">
               Ne zatvaraj stranicu. Kada test počne, pitanja se pojavljuju sama.
+            </p>
+            <p className="mt-2 text-[0.72rem] font-semibold leading-relaxed text-pencil">
+              Kad test počne, ne napuštaj ovu stranicu. Ako se vratiš, test se
+              automatski predaje.
             </p>
             {error ? (
               <p className="mt-3 text-[0.72rem] text-pencil">{error}</p>
@@ -818,6 +1110,11 @@ export function StudentApp({ code }: { code: string }) {
                 </div>
               ) : null}
 
+              <div className="mb-3 rounded-sm border border-pencil/30 bg-pencil-wash px-3 py-2 text-[0.72rem] leading-relaxed text-pencil">
+                Ne napuštaj ovu stranicu. Ako se vratiš na test, on se
+                automatski predaje.
+              </div>
+
               <div className="space-y-3">
                 {questions.map((question, index) => {
                   const value = answers[question.id];
@@ -835,7 +1132,40 @@ export function StudentApp({ code }: { code: string }) {
                         </span>
                       </div>
 
-                      {question.type === "cloze" ? (
+                      {question.type === "matching" ? (
+                        <>
+                          <p className="mt-2 text-[15px] leading-relaxed" dir="auto">
+                            {question.prompt}
+                          </p>
+                          <MatchingPairs
+                            prompt={question.prompt}
+                            pairs={question.pairs ?? []}
+                            value={
+                              Array.isArray(value)
+                                ? value
+                                : Array.from(
+                                    { length: (question.pairs ?? []).length },
+                                    () => -1,
+                                  )
+                            }
+                            onChange={(next) => saveAnswer(question, next)}
+                          />
+                        </>
+                      ) : question.type === "cloze_multi" ? (
+                        <MultiBlankHadith
+                          prompt={question.prompt}
+                          options={question.options}
+                          value={
+                            Array.isArray(value)
+                              ? value
+                              : Array.from(
+                                  { length: countBlanks(question.prompt) },
+                                  () => -1,
+                                )
+                          }
+                          onChange={(next) => saveAnswer(question, next)}
+                        />
+                      ) : question.type === "cloze" ? (
                         <p
                           className={clsx(
                             "mt-2 text-[15px] leading-relaxed",
@@ -870,6 +1200,8 @@ export function StudentApp({ code }: { code: string }) {
                         </p>
                       )}
 
+                      {question.type === "cloze_multi" ||
+                      question.type === "matching" ? null : (
                       <div className="mt-3">
                         {question.type === "tf" ? (
                           <div className="grid grid-cols-2 gap-2">
@@ -951,6 +1283,7 @@ export function StudentApp({ code }: { code: string }) {
                           </div>
                         )}
                       </div>
+                      )}
                     </section>
                   );
                 })}
@@ -997,7 +1330,7 @@ export function StudentApp({ code }: { code: string }) {
                   <p className="text-[10px] text-muted">
                     {remainingSeconds !== null && remainingSeconds <= 60
                       ? "Požuri — ostalo je manje od minute."
-                      : "Predaj kada završiš."}
+                      : "Ne napuštaj stranicu — vraćanje predaje test."}
                   </p>
                 </div>
                 <button
@@ -1038,8 +1371,9 @@ export function StudentApp({ code }: { code: string }) {
               {selected.name}
             </p>
             <p className="mt-2 text-xs leading-relaxed text-muted">
-              Ime se veže za ovaj telefon za vrijeme testa i ne može se mijenjati.
-              Provjeri da si izabrao svoje ime.
+              Ime se trajno veže za ovaj telefon u ovom odjeljenju. U sljedećem
+              testu ne možeš izabrati drugo ime. Provjeri da si izabrao svoje
+              ime.
             </p>
             <div className="mt-5 grid grid-cols-2 gap-2">
               <button

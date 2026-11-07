@@ -10,8 +10,18 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
-export type QuestionType = "tf" | "single" | "cloze";
-export type CorrectValue = boolean | number;
+export type QuestionType = "tf" | "single" | "cloze" | "cloze_multi" | "matching";
+/**
+ * `tf` → boolean; `single`/`cloze` → indeks opcije; `cloze_multi` → indeks iz
+ * zajedničke banke za svaku prazninu, redom kojim se praznine pojavljuju;
+ * `matching` → tačan odgovor se izvodi iz `pairs` (par i je par sa istim
+ * indeksom), pa je `correct` za taj tip `true`.
+ */
+export type CorrectValue = boolean | number | number[];
+/** Odgovor učenika: boolean, indeks opcije ili niz indeksa (po praznini/paru). */
+export type AnswerValue = boolean | number | number[];
+/** Par za povezivanje. */
+export type QuestionPair = { left: string; right: string };
 
 export const teachers = pgTable("teachers", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -86,6 +96,8 @@ export const questions = pgTable(
     prompt: text("prompt").notNull(),
     options: jsonb("options").$type<string[]>().notNull().default([]),
     correct: jsonb("correct").$type<CorrectValue>().notNull(),
+    /** Samo za tip `matching`; kod ostalih tipova prazan niz. */
+    pairs: jsonb("pairs").$type<QuestionPair[]>().notNull().default([]),
     points: integer("points").notNull().default(1),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -120,6 +132,38 @@ export const sessions = pgTable(
   ],
 );
 
+/**
+ * Trajna veza učenika i uređaja za jedno odjeljenje. Za razliku od
+ * `attempts.device_token` (koji važi samo za jednu sesiju), ovo sprečava da
+ * učenik u sljedećem testu izabere drugo ime. Nastavnik može osloboditi
+ * uređaj iz konzole testa kad učenik promijeni telefon ili pogriješi.
+ */
+export const studentDevices = pgTable(
+  "student_devices",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    classId: uuid("class_id")
+      .notNull()
+      .references(() => classes.id, { onDelete: "cascade" }),
+    studentId: uuid("student_id")
+      .notNull()
+      .references(() => students.id, { onDelete: "cascade" }),
+    deviceToken: text("device_token").notNull(),
+    /**
+     * Zadnja IP adresa s koje se uređaj prijavio. Služi samo za provjeru kod
+     * nastavnika — nije ključ identiteta jer su u školi uređaji često iza
+     * istog NAT-a, a DHCP/VPN mijenja adresu.
+     */
+    lastIpAddress: text("last_ip_address"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("student_devices_class_device_idx").on(table.classId, table.deviceToken),
+    uniqueIndex("student_devices_class_student_idx").on(table.classId, table.studentId),
+  ],
+);
+
 export const attempts = pgTable(
   "attempts",
   {
@@ -136,6 +180,14 @@ export const attempts = pgTable(
     score: integer("score").notNull().default(0),
     joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().defaultNow(),
     submittedAt: timestamp("submitted_at", { withTimezone: true }),
+    /**
+     * Kad je učenik zadnji put sakrio stranicu tokom aktivnog testa (home,
+     * app switcher, zaključan ekran…). Test se predaje tek kad se vrati.
+     */
+    leftAt: timestamp("left_at", { withTimezone: true }),
+    leaveCount: integer("leave_count").notNull().default(0),
+    /** student | time | left | closed | manual */
+    submitReason: text("submit_reason"),
   },
   (table) => [
     uniqueIndex("attempts_session_student_idx").on(table.sessionId, table.studentId),
@@ -153,8 +205,13 @@ export const answers = pgTable(
     questionId: uuid("question_id")
       .notNull()
       .references(() => questions.id, { onDelete: "cascade" }),
-    value: jsonb("value").$type<boolean | number>().notNull(),
+    value: jsonb("value").$type<AnswerValue>().notNull(),
     isCorrect: boolean("is_correct").notNull().default(false),
+    /**
+     * Bodovi za ovo pitanje. Kod većine tipova je 0 ili `points` pitanja, a kod
+     * povezivanja po jedan bod za svaki tačno spojen par.
+     */
+    earnedPoints: integer("earned_points").notNull().default(0),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [

@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
@@ -9,6 +9,7 @@ import {
   attempts,
   questions,
   sessions,
+  studentDevices,
   students,
 } from "@/db/schema";
 import { generateToken } from "@/lib/codes";
@@ -124,7 +125,12 @@ export async function closeSessionAction(sessionId: string): Promise<void> {
     const score = scoreAnswers(quizQuestions, answerRows);
     await db
       .update(attempts)
-      .set({ status: "submitted", score, submittedAt: new Date() })
+      .set({
+        status: "submitted",
+        score,
+        submittedAt: new Date(),
+        submitReason: "closed",
+      })
       .where(eq(attempts.id, attempt.id));
   }
 
@@ -199,7 +205,7 @@ export async function setManualScoreAction(
   if (!Number.isFinite(value)) return;
 
   const [existing] = await db
-    .select({ id: attempts.id })
+    .select({ id: attempts.id, status: attempts.status })
     .from(attempts)
     .where(
       and(eq(attempts.sessionId, sessionId), eq(attempts.studentId, studentId)),
@@ -209,7 +215,13 @@ export async function setManualScoreAction(
   if (existing) {
     await db
       .update(attempts)
-      .set({ status: "submitted", score: value, submittedAt: new Date() })
+      .set({
+        status: "submitted",
+        score: value,
+        submittedAt: new Date(),
+        // Ne prepisuj razlog (npr. „left”) ako je učenik već predao.
+        ...(existing.status === "submitted" ? {} : { submitReason: "manual" }),
+      })
       .where(eq(attempts.id, existing.id));
   } else {
     await db.insert(attempts).values({
@@ -220,6 +232,7 @@ export async function setManualScoreAction(
       status: "submitted",
       score: value,
       submittedAt: new Date(),
+      submitReason: "manual",
     });
   }
 
@@ -246,6 +259,59 @@ export async function resetAttemptAction(attemptId: string): Promise<void> {
   await db.delete(attempts).where(eq(attempts.id, attemptId));
   revalidatePath(`/teacher/sessions/${row.sessionId}`);
   revalidatePath(`/teacher/sessions/${row.sessionId}/results`);
+}
+
+/**
+ * Oslobađa uređaj koji je trajno vezan za učenika. Koristi se kad učenik
+ * promijeni telefon, obriše podatke preglednika ili izabere pogrešno ime.
+ *
+ * Dok test traje, briše i pokušaj tog učenika/uređaja u sesiji — inače
+ * uređaj ostaje zaključan za staro ime. Kod završenog testa historija ostaje.
+ */
+export async function releaseStudentDeviceAction(
+  sessionId: string,
+  studentId: string,
+): Promise<void> {
+  const { session } = await loadOwnedSession(sessionId);
+
+  const [binding] = await db
+    .select({ deviceToken: studentDevices.deviceToken })
+    .from(studentDevices)
+    .where(
+      and(
+        eq(studentDevices.classId, session.classId),
+        eq(studentDevices.studentId, studentId),
+      ),
+    )
+    .limit(1);
+
+  await db.transaction(async (tx) => {
+    await tx
+      .delete(studentDevices)
+      .where(
+        and(
+          eq(studentDevices.classId, session.classId),
+          eq(studentDevices.studentId, studentId),
+        ),
+      );
+
+    if (session.status === "closed") return;
+
+    const ownedAttempt = binding
+      ? or(
+          eq(attempts.studentId, studentId),
+          eq(attempts.deviceToken, binding.deviceToken),
+        )
+      : eq(attempts.studentId, studentId);
+
+    await tx
+      .delete(attempts)
+      .where(and(eq(attempts.sessionId, sessionId), ownedAttempt));
+  });
+
+  revalidatePath(`/teacher/sessions/${sessionId}`);
+  revalidatePath(`/teacher/sessions/${sessionId}/results`);
+  revalidatePath(`/teacher/classes/${session.classId}`);
 }
 
 export async function removeSessionAction(sessionId: string): Promise<void> {

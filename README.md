@@ -13,13 +13,13 @@ Aplikacija je napravljena za jednu školu i više nastavnika. Pilot predmet je h
 1. Napravi kviz — ručno kroz formu ili zalijepi pitanja iz teksta po šablonu; odmah izabere razred kojem kviz pripada.
 2. Sačuva kviz i otvori test u tom razredu (ili to uradi kasnije iz liste kvizova). Dobije kod od 6 znakova i QR kod.
 3. Pritisne „Počni test" kada su učenici spremni. Tajmer kreće za sve u istom trenutku.
-4. Gleda uživo ko je ušao, ko je predao i koliko bodova ima. Na kraju vidi matricu odgovora po pitanju.
+4. Gleda uživo ko je ušao, ko je predao i koliko bodova ima. Po potrebi oslobađa telefon koji je vezan za pogrešno ime. Na kraju vidi matricu odgovora po pitanju.
 
 **Učenik**
 
-1. Skenira QR ili otvori link, izabere svoje ime sa spiska.
+1. Skenira QR ili otvori link, izabere svoje ime sa spiska. Prvi izbor veže telefon za to ime u odjeljenju.
 2. Čeka da nastavnik pokrene test.
-3. Odgovara na 5 pitanja, odgovori se čuvaju automatski, predaje test. Vidi samo „predano" — bez tačnih odgovora.
+3. Odgovara na 5 pitanja, odgovori se čuvaju automatski, predaje test. Vidi samo „predano" — bez tačnih odgovora. Ako napusti stranicu tokom testa, test se predaje kada se vrati.
 
 **Ocjena**
 
@@ -31,19 +31,28 @@ Bodovi iz svih testova se sabiraju u pregledu uspjeha odjeljenja. Ocjenu i dalje
 
 - Prijava nastavnika emailom i lozinkom; uloga nastavnik i administrator.
 - Odjeljenja sa spiskom učenika (unos lijepljenjem, deaktivacija bez brisanja historije).
-- Kvizovi: 1–20 pitanja, 1 bod po pitanju; tipovi:
-  - tačno / netačno,
-  - jedan tačan odgovor,
-  - dopuna iz ponuđenih riječi (word bank — učenik tapne riječ, ne kuca).
+- Kvizovi: 1–20 pitanja; tipovi:
+  - tačno / netačno (1 bod),
+  - jedan tačan odgovor (1 bod),
+  - dopuna iz ponuđenih riječi (word bank — učenik tapne riječ, ne kuca; 1 bod).
+  - hadis / tekst sa više praznina (word bank za sve praznine — učenik tapne
+    prazninu, pa riječ; arapski tekst se čita zdesna nalijevo, a oznake
+    `(1)`, `(2)`… ostaju uz svoju prazninu; 1 bod).
+  - povezivanje parova (učenik tapne stavku lijevo, pa njenu stavku desno;
+    desna kolona je izmiješana; **1 bod po tačno spojenom paru**, pa pitanje sa
+    6 parova nosi 6 bodova).
 - Uvoz pitanja iz teksta po šablonu (vidi ispod).
 - AI uvoz: nastavnik ubaci `.docx`, `.txt` ili zalijepi tekst, a AI predloži 5 pitanja (do 10 ako ih dokument ima više) i tačne odgovore. Predlog se uvijek otvara u editoru — nastavnik ga pregleda i tek onda čuva.
 - Kviz pripada jednom razredu; pokreće se samo u njemu. Za drugo odjeljenje duplikuj kviz i izmijeni pitanja.
 - „Sačuvaj i otvori test" odmah pravi lobby sesiju; ako razred već ima otvoren test, nudi se nastavak umjesto drugog koda.
 - Sesija: QR + 6-znakovni kod, lobby, sinhronizovani tajmer (3/5/6/10 min), zaključavanje ulaza, produženje vremena, poništavanje pokušaja, ručni upis rezultata za odsutne.
-- Učenik bez naloga: ime se veže za uređaj za tu sesiju, jedan pokušaj po učeniku.
+- Napuštanje testa: kad učenik sakrije stranicu (home, app switcher, zaključan ekran), to se beleži; test se automatski predaje kada se vrati. Kratak prekid ne predaje odmah. Nastavnik u konzoli vidi oznake „napustio" i „predao (izašao)".
+- Učenik bez naloga: ime se trajno veže za uređaj u odjeljenju (ne samo za jednu sesiju), jedan pokušaj po učeniku. Nastavnik može osloboditi uređaj iz konzole testa.
 - Lokalno čuvanje odgovora: svaki odgovor se upisuje u `localStorage` prije slanja; poslije reloada se vraća i ponovo šalje. Predaja čeka da svi odgovori stignu na server.
 - Rezultati uživo, matrica učenik × pitanje, uspješnost po pitanju, štampa i CSV izvoz.
-- Arapski tekst i RTL prikaz u pitanjima i ponuđenim odgovorima.
+- Arapski tekst i RTL prikaz u pitanjima i ponuđenim odgovorima; kod hadisa sa
+  prazninama praznine ostaju na svom mjestu u rečenici i kad se tekst čita
+  zdesna nalijevo.
 - Mobilni učenički ekran prilagođen telefonu.
 
 ### Šablon za uvoz pitanja
@@ -63,11 +72,32 @@ Tačno: T
 3. Lanac prenosilaca naziva se _____.
 Riječi: isnad, matn, šerh, tefsir
 Tačno: isnad
+
+4. Dopuni hadis o nijjetu.
+„Zaista se djela vrednuju prema _____ (1), i zaista svakom čovjeku pripada ono
+što je _____ (2), a čija hidžra bude radi materijalne dobiti koju želi
+_____ (3).“
+Riječi: zanijetio, namjerama, iselio, ostvariti, dobiti
+Praznine: namjerama; zanijetio; ostvariti
 ```
 
 - `Tačno:` prima `T`/`N`, `Tačno`/`Netačno`, `Da`/`Ne`, ili slovo/number opcije.
 - Ako nema opcija i nema riječi, pitanje je tačno/netačno.
 - Kod dopune, `Riječi:` je obavezan; ako u tekstu nema `_____`, dodaje se na kraj.
+- Kod teksta sa više praznina: stavi `_____ (1)`, `_____ (2)`… u tekst, `Riječi:`
+  je zajednička banka (tačne i netačne riječi), a `Praznine: riječ1; riječ2; …`
+  daje tačnu riječ za svaku prazninu redom. Ako broj praznina i odgovora ne
+  odgovara, uvoz prijavi grešku umjesto da nešto pogodi.
+- Kod povezivanja: prvi red je uputa (tekst pitanja), a svaki par ide u svoj
+  red kao `1) arapski izraz = prijevod` (najviše osam parova). Prvi red ne
+  smije početi brojem i zagradom, inače bi ga uvoz čitao kao par.
+
+```text
+5. Poveži arapski izraz s prijevodom.
+1) إِذَا لَقِيتَهُ فَسَلِّمْ عَلَيْهِ = Kada ga sretneš, nazovi mu selam.
+2) وَإِذَا دَعَاكَ فَأَجِبْهُ = Kada te pozove, odazovi mu se.
+3) وَإِذَا مَاتَ فَاتَّبِعْهُ = Kada umre, isprati mu dženazu.
+```
 
 ---
 
@@ -223,9 +253,10 @@ DATABASE_URL="<pooler-url>" npm run db:password -- profesor@skola.ba "nova-lozin
 - `teachers` — nalozi, uloga `teacher`/`admin`, bcrypt hash.
 - `classes` — odjeljenje, školska godina, nastavnik.
 - `students` — učenik u odjeljenju, `active` za meko brisanje.
+- `student_devices` — trajna veza učenika i uređaja u odjeljenju; jedan uređaj po učeniku i jedno ime po uređaju. Nastavnik je može osloboditi iz konzole testa.
 - `quizzes` / `questions` — sadržaj kviza i razred kojem pripada; pitanja se ne mijenjaju ako je kviz korišten (historija ostaje tačna).
 - `sessions` — izvođenje kviza u odjeljenju; kod, status, tajmer, zaključan ulaz.
-- `attempts` — jedan pokušaj učenika u sesiji; token uređaja, token pokušaja, bodovi.
+- `attempts` — jedan pokušaj učenika u sesiji; token uređaja, token pokušaja, bodovi, razlog predaje (`student`/`time`/`left`/`closed`) i broj napuštanja stranice sa zadnjim vremenom.
 - `answers` — odgovor po pitanju, odmah ocijenjen.
 - `grades` — ocjene nastavnika, više po polugodištu.
 
@@ -235,9 +266,10 @@ Kviz pripada jednom razredu, a sesija je jedno izvođenje tog kviza. Ako isti sa
 
 ## Sigurnost i ograničenja
 
-- **Identitet učenika nije verifikovan.** Ime se veže za uređaj (localStorage + jedinstveni indeks u bazi) samo za tu sesiju. Učenik može obrisati podatke preglednika ili uzeti drugi telefon; tada ga blokira zauzeto ime, a nastavnik poništava pokušaj. Ovo je dovoljno za rad u učionici, ne za dokazivanje identiteta.
+- **Identitet učenika nije verifikovan.** Pri prvom ulasku učenik sam izabere ime; aplikacija taj izbor trajno veže za uređaj (HttpOnly kolačić + `localStorage` + jedinstveni indeks u bazi) za cijelo odjeljenje, ne samo za jednu sesiju. U sljedećem testu učenik ne može izabrati drugo ime, a ni ime drugog učenika ne može preuzeti na svom telefonu. Ako učenik promijeni telefon ili obriše sve podatke preglednika, nastavnik oslobodi uređaj u konzoli testa. Prvi ulazak se ne može kriptografski dokazati — ako je ime ukradeno prije nego što ga je pravi učenik preuzeo, nastavnik poništi pokušaj i oslobodi uređaj. **IP adresa se ne koristi kao ključ identiteta**: u školi su uređaji često iza istog NAT-a, a DHCP/VPN je mijenja; čuva se samo kao podatak za nastavnikovu provjeru.
+- **Napuštanje testa se detektuje, ne sprečava.** Preglednik ne može blokirati home dugme ni app switcher. Aplikacija sluša `visibilitychange` i `pagehide`, beleži napuštanje (vrijeme i broj) i predaje test kada se učenik vrati — i poslije reloada ili ponovnog otvaranja taba. Kratak poziv ili poruka takođe može predati test; zato je upozorenje prikazano prije i tokom testa. Split-screen, drugi telefon ili VPN ostaju zaobići; za pravu zaključanost potreban je kiosk režim (Android screen pinning/MDM, iOS Guided Access) ili native aplikacija.
 - **Kasni ulazak** je dozvoljen dok nastavnik ne zaključa ulaz ili ne istekne vrijeme. Učenik dobija preostalo vrijeme.
-- **Jedan pokušaj** po učeniku po sesiji. Nastavnik može poništiti pokušaj i ručno upisati bodove.
+- **Jedan pokušaj** po učeniku po sesiji. Nastavnik može poništiti pokušaj, osloboditi uređaj i ručno upisati bodove.
 - **Nema djelimičnih bodova**: 1 pitanje = 1 bod; tačno ili netačno.
 - **Nema e-dnevnika**, roditeljskog portala ni sinhronizacije sa Google Classroomom.
 - **Nema AI-a ni uvoza dokumenata.** Sljedeći korak, ako se pokaže potreba, je da AI predloži pitanja iz `.docx` lekcije, a nastavnik ih pregleda i izmijeni.

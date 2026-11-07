@@ -17,6 +17,9 @@ async function loadAttempt(token: string) {
     .select({
       attemptId: attempts.id,
       attemptStatus: attempts.status,
+      submitReason: attempts.submitReason,
+      leaveCount: attempts.leaveCount,
+      leftAt: attempts.leftAt,
       sessionId: sessions.id,
       sessionStatus: sessions.status,
       endsAt: sessions.endsAt,
@@ -51,6 +54,9 @@ export async function GET(
     studentName: attempt.studentName,
     className: attempt.className,
     code: attempt.code,
+    submitReason: attempt.submitReason,
+    leaveCount: attempt.leaveCount,
+    leftAt: attempt.leftAt,
   };
 
   if (attempt.attemptStatus === "submitted") {
@@ -58,8 +64,12 @@ export async function GET(
   }
 
   if (attempt.sessionStatus === "closed") {
-    await finalizeAttempt(attempt.attemptId, attempt.quizId);
-    return Response.json({ status: "submitted", ...meta });
+    await finalizeAttempt(attempt.attemptId, attempt.quizId, "closed");
+    return Response.json({
+      status: "submitted",
+      ...meta,
+      submitReason: "closed",
+    });
   }
 
   if (attempt.sessionStatus === "lobby") {
@@ -67,9 +77,15 @@ export async function GET(
   }
 
   if (attempt.endsAt && attempt.endsAt.getTime() + 5000 < Date.now()) {
-    await finalizeAttempt(attempt.attemptId, attempt.quizId);
-    return Response.json({ status: "submitted", reason: "time", ...meta });
+    await finalizeAttempt(attempt.attemptId, attempt.quizId, "time");
+    return Response.json({
+      status: "submitted",
+      reason: "time",
+      ...meta,
+      submitReason: "time",
+    });
   }
+
 
   const questionRows = await db
     .select({
@@ -77,6 +93,7 @@ export async function GET(
       type: questions.type,
       prompt: questions.prompt,
       options: questions.options,
+      pairs: questions.pairs,
       position: questions.position,
     })
     .from(questions)

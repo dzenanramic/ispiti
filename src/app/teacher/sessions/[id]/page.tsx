@@ -18,6 +18,7 @@ import { PageHeader } from "@/components/ui";
 import { getBaseUrl } from "@/lib/base-url";
 import { pointWord, studentWord } from "@/lib/format";
 import { requireUser } from "@/lib/guard";
+import { listClassDeviceBindings } from "@/lib/student-devices";
 
 export const dynamic = "force-dynamic";
 
@@ -76,6 +77,9 @@ export default async function SessionPage({
       score: attempts.score,
       joinedAt: attempts.joinedAt,
       submittedAt: attempts.submittedAt,
+      leftAt: attempts.leftAt,
+      leaveCount: attempts.leaveCount,
+      submitReason: attempts.submitReason,
     })
     .from(attempts)
     .where(eq(attempts.sessionId, session.id));
@@ -96,6 +100,11 @@ export default async function SessionPage({
     color: { dark: "#0c4534", light: "#ffffff" },
   });
 
+  const bindingRows = await listClassDeviceBindings(session.classId);
+  const bindingByStudent = new Map(
+    bindingRows.map((binding) => [binding.studentId, binding]),
+  );
+
   const initial = {
     session: {
       id: session.id,
@@ -113,10 +122,18 @@ export default async function SessionPage({
     },
     students: studentRows.map((student) => {
       const attempt = attemptRows.find((row) => row.studentId === student.id);
-      if (!attempt) return { id: student.id, name: student.name, attempt: null };
+      const binding = bindingByStudent.get(student.id);
+      const device = {
+        deviceBound: Boolean(binding),
+        deviceIp: binding?.lastIpAddress ?? null,
+      };
+      if (!attempt) {
+        return { id: student.id, name: student.name, ...device, attempt: null };
+      }
       return {
         id: student.id,
         name: student.name,
+        ...device,
         attempt: {
           id: attempt.id,
           status: attempt.status,
@@ -124,6 +141,9 @@ export default async function SessionPage({
           answered: answerRows.filter((row) => row.attemptId === attempt.id).length,
           joinedAt: attempt.joinedAt.toISOString(),
           submittedAt: attempt.submittedAt?.toISOString() ?? null,
+          leftAt: attempt.leftAt?.toISOString() ?? null,
+          leaveCount: attempt.leaveCount,
+          submitReason: attempt.submitReason,
         },
       };
     }),

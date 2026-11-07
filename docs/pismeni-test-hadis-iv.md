@@ -3,6 +3,19 @@
 **Status:** predlog strukture, još nije implementirano u aplikaciji.
 **Izvor:** `pismeni_test_hadis_IV-v3.docx` (50 bodova, 6 zadataka, 3 grupe).
 
+> **Ažurirano:** tip `cloze_multi` (hadis sa više praznina i zajedničkom bankom
+> riječi) je implementiran kao pitanje u brzom kvizu, sa uvozom iz teksta
+> (red `Praznine:`) i AI uvozom. Time se A1–A4 iz ovog dokumenta mogu već sada
+> unijeti i raditi u aplikaciji.
+>
+> Implementirano je i **povezivanje parova** (`matching`, zadatak B2): učenik
+> tapne stavku lijevo pa njenu stavku desno, desna kolona je izmiješana, a
+> boduje se **1 bod po tačno spojenom paru** (6 parova = 6 bodova, djelimični
+> bodovi se sabiraju).
+>
+> Još nije urađeno: `short_answer` (B1, B3), esej (C1), sekcije A/B/C, 45 min i
+> ručno ocjenjivanje.
+
 ## Preporuka
 
 Ovaj dokument nije petominutni kviz. To je pismeni test od 50 bodova sa

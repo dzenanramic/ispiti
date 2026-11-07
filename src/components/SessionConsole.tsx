@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   Clock,
   ExternalLink,
+  Link2Off,
   Loader2,
   Lock,
   PencilLine,
@@ -21,6 +22,7 @@ import { clsx } from "clsx";
 import {
   closeSessionAction,
   extendSessionAction,
+  releaseStudentDeviceAction,
   resetAttemptAction,
   setJoinLockAction,
   setManualScoreAction,
@@ -28,7 +30,7 @@ import {
 } from "@/app/actions/sessions";
 import { CopyButton } from "@/components/CopyButton";
 import { StatusBadge } from "@/components/ui";
-import { formatDuration } from "@/lib/format";
+import { formatDateTime, formatDuration } from "@/lib/format";
 
 type LiveAttempt = {
   id: string;
@@ -37,11 +39,17 @@ type LiveAttempt = {
   answered: number;
   joinedAt: string;
   submittedAt: string | null;
+  leftAt: string | null;
+  leaveCount: number;
+  submitReason: string | null;
 };
 
 type LiveStudent = {
   id: string;
   name: string;
+  /** Telefon je trajno vezan za ovo ime u odjeljenju. */
+  deviceBound: boolean;
+  deviceIp: string | null;
   attempt: LiveAttempt | null;
 };
 
@@ -82,6 +90,7 @@ export function SessionConsole({
   const [pending, startTransition] = useTransition();
   const [pendingReset, setPendingReset] = useState<string | null>(null);
   const [pendingManual, setPendingManual] = useState<string | null>(null);
+  const [pendingRelease, setPendingRelease] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -192,6 +201,29 @@ export function SessionConsole({
         setError("Nije moguće poništiti pokušaj.");
       } finally {
         setPendingReset(null);
+      }
+    });
+  }
+
+  function releaseDevice(student: LiveStudent) {
+    const message =
+      session.status === "closed"
+        ? `Osloboditi uređaj za ${student.name}? Historija ovog testa ostaje sačuvana.`
+        : student.attempt
+          ? `Osloboditi uređaj za ${student.name}? Poništava se i pokušaj u ovom testu, pa učenik može ponovo izabrati ime.`
+          : `Osloboditi uređaj za ${student.name}? Učenik će moći ponovo izabrati ime na ovom telefonu.`;
+
+    if (!window.confirm(message)) return;
+
+    setPendingRelease(student.id);
+    startTransition(async () => {
+      try {
+        await releaseStudentDeviceAction(sessionId, student.id);
+        await load();
+      } catch {
+        setError("Nije moguće osloboditi uređaj.");
+      } finally {
+        setPendingRelease(null);
       }
     });
   }
@@ -449,6 +481,9 @@ export function SessionConsole({
                     isSubmitted &&
                     attempt!.answered === 0 &&
                     attempt!.score > 0;
+                  const leftTest = Boolean(attempt && attempt.leaveCount > 0);
+                  const leftSubmitted = Boolean(isSubmitted && leftTest);
+                  const leftWhileActive = leftTest && !isSubmitted;
                   return (
                     <tr
                       key={student.id}
@@ -466,12 +501,31 @@ export function SessionConsole({
                               "badge",
                               isManual
                                 ? "border-rule bg-paper text-muted"
-                                : isSubmitted
-                                  ? "border-forest/30 bg-forest-wash text-forest-deep"
-                                  : "border-rule bg-ink-wash text-ink-soft",
+                                : leftSubmitted || leftWhileActive
+                                  ? "border-pencil/40 bg-pencil-wash text-pencil"
+                                  : isSubmitted
+                                    ? "border-forest/30 bg-forest-wash text-forest-deep"
+                                    : "border-rule bg-ink-wash text-ink-soft",
                             )}
+                            title={
+                              leftTest
+                                ? `Napustio test ${attempt.leaveCount}×${
+                                    attempt.leftAt
+                                      ? ` · zadnji put ${formatDateTime(attempt.leftAt)}`
+                                      : ""
+                                  }`
+                                : undefined
+                            }
                           >
-                            {isManual ? "ručno" : isSubmitted ? "predao" : "u toku"}
+                            {isManual
+                              ? "ručno"
+                              : leftSubmitted
+                                ? "predao (izašao)"
+                                : isSubmitted
+                                  ? "predao"
+                                  : leftWhileActive
+                                    ? "napustio"
+                                    : "u toku"}
                           </span>
                         ) : (
                           <span className="text-xs text-muted">nije ušao</span>
@@ -495,35 +549,56 @@ export function SessionConsole({
                         )}
                       </td>
                       <td className="px-2 py-2.5">
-                        {attempt ? (
-                          <button
-                            type="button"
-                            onClick={() => resetAttempt(attempt.id, student.name)}
-                            disabled={pending || pendingReset === attempt.id}
-                            className="btn btn-ghost !min-h-7 !p-1 text-muted hover:text-pencil"
-                            title="Poništi pokušaj"
-                          >
-                            {pendingReset === attempt.id ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <RotateCcw className="h-3.5 w-3.5" />
-                            )}
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => enterManualScore(student)}
-                            disabled={pending || pendingManual === student.id}
-                            className="btn btn-ghost !min-h-7 !p-1 text-muted hover:text-forest"
-                            title="Ručno upiši rezultat"
-                          >
-                            {pendingManual === student.id ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <PencilLine className="h-3.5 w-3.5" />
-                            )}
-                          </button>
-                        )}
+                        <div className="flex items-center justify-end gap-1">
+                          {student.deviceBound ? (
+                            <button
+                              type="button"
+                              onClick={() => releaseDevice(student)}
+                              disabled={pending || pendingRelease === student.id}
+                              className="btn btn-ghost !min-h-7 !p-1 text-muted hover:text-forest"
+                              title={`Oslobodi uređaj — ${student.name}${
+                                student.deviceIp
+                                  ? ` (IP ${student.deviceIp})`
+                                  : ""
+                              }`}
+                            >
+                              {pendingRelease === student.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Link2Off className="h-3.5 w-3.5" />
+                              )}
+                            </button>
+                          ) : null}
+                          {attempt ? (
+                            <button
+                              type="button"
+                              onClick={() => resetAttempt(attempt.id, student.name)}
+                              disabled={pending || pendingReset === attempt.id}
+                              className="btn btn-ghost !min-h-7 !p-1 text-muted hover:text-pencil"
+                              title="Poništi pokušaj"
+                            >
+                              {pendingReset === attempt.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <RotateCcw className="h-3.5 w-3.5" />
+                              )}
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => enterManualScore(student)}
+                              disabled={pending || pendingManual === student.id}
+                              className="btn btn-ghost !min-h-7 !p-1 text-muted hover:text-forest"
+                              title="Ručno upiši rezultat"
+                            >
+                              {pendingManual === student.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <PencilLine className="h-3.5 w-3.5" />
+                              )}
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -548,6 +623,11 @@ export function SessionConsole({
             <p className="mt-2 text-[0.72rem] text-muted">
               Predalo {submitted.length} od {session.totalStudents} učenika.
               Rezultati se osvježavaju svake dvije sekunde.
+            </p>
+            <p className="mt-1 text-[0.72rem] text-muted">
+              Ime je trajno vezano za telefon u ovom odjeljenju. Ikona pored
+              učenika oslobađa uređaj ako je promijenio telefon ili izabrao
+              pogrešno ime.
             </p>
           </div>
         </section>

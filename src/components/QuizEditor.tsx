@@ -20,7 +20,7 @@ import { clsx } from "clsx";
 import { saveQuizAction } from "@/app/actions/quizzes";
 import { startQuizSessionAction } from "@/app/actions/sessions";
 import { generateQuizFromFileAction } from "@/app/actions/ai-import";
-import { parseQuestions } from "@/lib/parse-questions";
+import { parseQuestions, countBlanks, renumberBlankLabels } from "@/lib/parse-questions";
 import type { QuestionInput, QuestionType } from "@/lib/types";
 
 type EditorQuestion = QuestionInput & { key: string };
@@ -40,6 +40,8 @@ const TYPE_LABELS: Record<QuestionType, string> = {
   single: "Jedan tačan odgovor",
   tf: "Tačno / Netačno",
   cloze: "Dopuna (ponuđene riječi)",
+  cloze_multi: "Hadis / tekst — više praznina",
+  matching: "Povezivanje parova",
 };
 
 const LETTERS = ["A", "B", "C", "D", "E", "F", "G", "H"];
@@ -56,7 +58,19 @@ Tačno: T
 
 3. Lanac prenosilaca naziva se _____.
 Riječi: isnad, matn, šerh, tefsir
-Tačno: isnad`;
+Tačno: isnad
+
+4. Dopuni hadis o nijjetu.
+„Zaista se djela vrednuju prema _____ (1), i zaista svakom čovjeku pripada ono
+što je _____ (2), a čija hidžra bude radi materijalne dobiti koju želi
+_____ (3).“
+Riječi: zanijetio, namjerama, iselio, ostvariti, dobiti
+Praznine: namjerama; zanijetio; ostvariti
+
+5. Poveži arapski izraz s prijevodom.
+1) إِذَا لَقِيتَهُ فَسَلِّمْ عَلَيْهِ = Kada ga sretneš, nazovi mu selam.
+2) وَإِذَا دَعَاكَ فَأَجِبْهُ = Kada te pozove, odazovi mu se.
+3) وَإِذَا مَاتَ فَاتَّبِعْهُ = Kada umre, isprati mu dženazu.`;
 
 function makeKey(): string {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -75,6 +89,29 @@ function pluralBs(n: number, one: string, few: string, many: string): string {
 function blankQuestion(type: QuestionType = "single"): EditorQuestion {
   if (type === "tf") {
     return { key: makeKey(), type, prompt: "", options: [], correct: true };
+  }
+  if (type === "cloze_multi") {
+    return {
+      key: makeKey(),
+      type,
+      prompt: "",
+      options: ["", "", "", ""],
+      correct: [],
+    };
+  }
+  if (type === "matching") {
+    return {
+      key: makeKey(),
+      type,
+      prompt: "",
+      options: [],
+      correct: true,
+      pairs: [
+        { left: "", right: "" },
+        { left: "", right: "" },
+        { left: "", right: "" },
+      ],
+    };
   }
   return {
     key: makeKey(),
@@ -143,16 +180,50 @@ export function QuizEditor({
   function changeType(index: number, type: QuestionType) {
     const question = questions[index];
     if (type === "tf") {
-      updateQuestion(index, { ...question, type, options: [], correct: true });
+      updateQuestion(index, {
+        ...question,
+        type,
+        options: [],
+        correct: true,
+        pairs: [],
+      });
+      return;
+    }
+    if (type === "matching") {
+      updateQuestion(index, {
+        ...question,
+        type,
+        options: [],
+        correct: true,
+        pairs:
+          question.pairs && question.pairs.length >= 2
+            ? question.pairs
+            : [
+                { left: "", right: "" },
+                { left: "", right: "" },
+                { left: "", right: "" },
+              ],
+      });
       return;
     }
     const options =
-      question.options.length >= 2 ? question.options : ["", "", "", ""];
+      type === "cloze_multi"
+        ? [...question.options, "", "", "", ""].slice(0, Math.max(4, question.options.length))
+        : question.options.length >= 2
+          ? question.options
+          : ["", "", "", ""];
+    const correct =
+      type === "cloze_multi"
+        ? Array.from({ length: countBlanks(question.prompt) }, () => -1)
+        : typeof question.correct === "number"
+          ? question.correct
+          : 0;
     updateQuestion(index, {
       ...question,
       type,
       options,
-      correct: typeof question.correct === "number" ? question.correct : 0,
+      correct,
+      pairs: [],
     });
   }
 
@@ -178,7 +249,7 @@ export function QuizEditor({
 
   function addOption(qIndex: number) {
     const question = questions[qIndex];
-    if (question.options.length >= 8) return;
+    if (question.options.length >= 12) return;
     updateQuestion(qIndex, {
       ...question,
       options: [...question.options, ""],
@@ -189,11 +260,79 @@ export function QuizEditor({
     const question = questions[qIndex];
     if (question.options.length <= 2) return;
     const options = question.options.filter((_, i) => i !== oIndex);
+
+    if (Array.isArray(question.correct)) {
+      // Više praznina: shift indekse; praznina koja je pokazivala na obrisanu
+      // opciju ostaje prazna (-1) da nastavnik ponovo izabere.
+      const correct = question.correct.map((value) => {
+        if (value === oIndex) return -1;
+        return value > oIndex ? value - 1 : value;
+      });
+      updateQuestion(qIndex, { ...question, options, correct });
+      return;
+    }
+
     const current = typeof question.correct === "number" ? question.correct : 0;
     let correct = current;
     if (oIndex === current) correct = 0;
     else if (oIndex < current) correct = current - 1;
     updateQuestion(qIndex, { ...question, options, correct });
+  }
+
+  /** Uskladi broj odgovora sa brojem praznina u tekstu, bez gubljenja unosa. */
+  function syncBlankAnswers(qIndex: number, prompt: string): void {    const question = questions[qIndex];
+    const length = countBlanks(prompt);
+    const current = Array.isArray(question.correct) ? question.correct : [];
+    const correct = Array.from(
+      { length },
+      (_, index) => current[index] ?? -1,
+    );
+    updateQuestion(qIndex, { ...question, prompt, correct });
+  }
+
+  function setBlankAnswer(qIndex: number, blankIndex: number, optionIndex: number) {
+    const question = questions[qIndex];
+    const current = Array.isArray(question.correct) ? [...question.correct] : [];
+    while (current.length <= blankIndex) current.push(-1);
+    // Ista riječ ne može stati u dvije praznine.
+    const duplicate = current.indexOf(optionIndex);
+    if (duplicate !== -1 && duplicate !== blankIndex) current[duplicate] = -1;
+    current[blankIndex] = optionIndex;
+    updateQuestion(qIndex, { ...question, correct: current });
+  }
+
+  function setPair(qIndex: number, pairIndex: number, side: "left" | "right", value: string) {
+    const question = questions[qIndex];
+    const pairs = (question.pairs ?? []).map((pair, i) =>
+      i === pairIndex ? { ...pair, [side]: value } : pair,
+    );
+    updateQuestion(qIndex, { ...question, pairs });
+  }
+
+  function addPair(qIndex: number) {
+    const question = questions[qIndex];
+    const pairs = question.pairs ?? [];
+    if (pairs.length >= 8) return;
+    updateQuestion(qIndex, {
+      ...question,
+      pairs: [...pairs, { left: "", right: "" }],
+    });
+  }
+
+  function removePair(qIndex: number, pairIndex: number) {
+    const question = questions[qIndex];
+    const pairs = (question.pairs ?? []).filter((_, i) => i !== pairIndex);
+    if (pairs.length < 2) return;
+    updateQuestion(qIndex, { ...question, pairs });
+  }
+
+  function movePair(qIndex: number, pairIndex: number, direction: -1 | 1) {
+    const question = questions[qIndex];
+    const pairs = [...(question.pairs ?? [])];
+    const target = pairIndex + direction;
+    if (target < 0 || target >= pairs.length) return;
+    [pairs[pairIndex], pairs[target]] = [pairs[target], pairs[pairIndex]];
+    updateQuestion(qIndex, { ...question, pairs });
   }
 
   function applyImport(mode: "append" | "replace") {
@@ -238,6 +377,28 @@ export function QuizEditor({
         continue;
       }
 
+      if (question.type === "matching") {
+        const pairs = (question.pairs ?? []).map((pair) => ({
+          left: pair.left.trim(),
+          right: pair.right.trim(),
+        }));
+        if (pairs.length < 2) {
+          return `Pitanje ${index + 1}: povezivanje traži najmanje dva para.`;
+        }
+        if (pairs.some((pair) => !pair.left || !pair.right)) {
+          return `Pitanje ${index + 1}: popuni obje strane svakog para.`;
+        }
+        const lefts = new Set(pairs.map((pair) => pair.left.toLocaleLowerCase("bs")));
+        if (lefts.size !== pairs.length) {
+          return `Pitanje ${index + 1}: dvije stavke s lijeve strane su iste.`;
+        }
+        const rights = new Set(pairs.map((pair) => pair.right.toLocaleLowerCase("bs")));
+        if (rights.size !== pairs.length) {
+          return `Pitanje ${index + 1}: dvije stavke s desne strane su iste.`;
+        }
+        continue;
+      }
+
       const options = question.options.map((option) => option.trim());
       if (options.length < 2) {
         return `Pitanje ${index + 1}: potrebne su najmanje dvije opcije.`;
@@ -245,6 +406,33 @@ export function QuizEditor({
       if (options.some((option) => !option)) {
         return `Pitanje ${index + 1}: popuni sve opcije ili obriši praznu.`;
       }
+
+      if (question.type === "cloze_multi") {
+        const blanks = countBlanks(question.prompt);
+        if (blanks < 2) {
+          return `Pitanje ${index + 1}: tekst treba najmanje dvije praznine (_____).`;
+        }
+        const answers = Array.isArray(question.correct) ? question.correct : [];
+        if (answers.length !== blanks) {
+          return `Pitanje ${index + 1}: ima ${blanks} praznina, a ${answers.length} odgovora.`;
+        }
+        for (let blankIndex = 0; blankIndex < blanks; blankIndex += 1) {
+          const answer = answers[blankIndex];
+          if (
+            typeof answer !== "number" ||
+            answer < 0 ||
+            answer >= options.length
+          ) {
+            return `Pitanje ${index + 1}: za prazninu ${blankIndex + 1} izaberi riječ.`;
+          }
+        }
+        const duplicate = answers.length !== new Set(answers).size;
+        if (duplicate) {
+          return `Pitanje ${index + 1}: ista riječ je tačna za dvije praznine.`;
+        }
+        continue;
+      }
+
       if (
         typeof question.correct !== "number" ||
         question.correct < 0 ||
@@ -287,6 +475,20 @@ export function QuizEditor({
             prompt,
             options: [] as string[],
             correct: Boolean(question.correct),
+            pairs: [],
+          };
+        }
+
+        if (question.type === "matching") {
+          return {
+            type: question.type,
+            prompt,
+            options: [] as string[],
+            correct: true,
+            pairs: (question.pairs ?? []).map((pair) => ({
+              left: pair.left.trim(),
+              right: pair.right.trim(),
+            })),
           };
         }
 
@@ -294,7 +496,10 @@ export function QuizEditor({
           type: question.type,
           prompt,
           options: question.options.map((option) => option.trim()),
-          correct: Number(question.correct),
+          correct: Array.isArray(question.correct)
+            ? question.correct
+            : Number(question.correct),
+          pairs: [],
         };
       }),
     };
@@ -703,18 +908,16 @@ export function QuizEditor({
         <p className="font-sans text-xs text-muted">
           Bodovi se sabiraju: 1 pitanje = 1 bod
         </p>
-        {!aiEnabled ? (
-          <button
-            type="button"
-            onClick={() => setImportOpen((open) => !open)}
-            className="link"
-          >
-            {importOpen ? "Zatvori uvoz iz teksta" : "Uvezi pitanja iz teksta"}
-          </button>
-        ) : null}
+        <button
+          type="button"
+          onClick={() => setImportOpen((open) => !open)}
+          className="link"
+        >
+          {importOpen ? "Zatvori uvoz iz teksta" : "Uvezi pitanja iz teksta"}
+        </button>
       </div>
 
-      {!aiEnabled && importOpen ? (
+      {importOpen ? (
         <div className="mb-5 border border-rule bg-lift p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -763,7 +966,10 @@ export function QuizEditor({
             Svako pitanje počinje brojem. Opcije napiši kao A), B), C) i dodaj
             red Tačno: A. Za tačno/netačno napiši Tačno: T ili Tačno: N. Za
             dopunu stavi _____ u pitanje, navedi Riječi: a, b, c i napiši red
-            Tačno: a.
+            Tačno: a. Za tekst sa više praznina stavi _____ (1), _____ (2)…
+            i napiši red Praznine: riječ1; riječ2; … — redom po prazninama.
+            Za povezivanje napiši parove kao 1) arap. izraz = prijevod, svaki
+            u svom redu (najviše osam parova).
           </p>
 
           {importErrors.length > 0 ? (
@@ -856,18 +1062,56 @@ export function QuizEditor({
 
             <textarea
               value={question.prompt}
-              onChange={(event) =>
-                updateQuestion(index, { ...question, prompt: event.target.value })
-              }
-              rows={question.type === "cloze" ? 3 : 2}
+              onChange={(event) => {
+                if (question.type === "cloze_multi") {
+                  syncBlankAnswers(index, event.target.value);
+                } else {
+                  updateQuestion(index, { ...question, prompt: event.target.value });
+                }
+              }}
+              rows={question.type === "cloze_multi" ? 5 : question.type === "cloze" ? 3 : 2}
               className="textarea mt-3"
               dir="auto"
               placeholder={
-                question.type === "cloze"
-                  ? "Tekst sa _____ na mjestu praznine…"
-                  : "Tekst pitanja…"
+                question.type === "cloze_multi"
+                  ? "Tekst hadisa sa prazninama: _____ (1) … _____ (2) …"
+                  : question.type === "matching"
+                    ? "Uputa, npr. Poveži arapski izraz s prijevodom."
+                    : question.type === "cloze"
+                      ? "Tekst sa _____ na mjestu praznine…"
+                      : "Tekst pitanja…"
               }
             />
+
+            {question.type === "cloze_multi" ? (
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-[0.72rem] text-muted">
+                <span>
+                  Praznine:{" "}
+                  <strong className="text-ink">{countBlanks(question.prompt)}</strong>
+                </span>
+                <span aria-hidden="true">·</span>
+                <span>
+                  Odgovoreno:{" "}
+                  <strong className="text-ink">
+                    {(Array.isArray(question.correct) ? question.correct : []).filter(
+                      (value) => value >= 0,
+                    ).length}
+                  </strong>
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    updateQuestion(index, {
+                      ...question,
+                      prompt: renumberBlankLabels(question.prompt),
+                    })
+                  }
+                  className="ml-auto font-semibold text-forest hover:text-forest-deep"
+                >
+                  Pobroji praznine (1), (2)…
+                </button>
+              </div>
+            ) : null}
 
             {question.type === "tf" ? (
               <div className="mt-3 flex gap-2">
@@ -889,29 +1133,127 @@ export function QuizEditor({
                   </button>
                 ))}
               </div>
+            ) : question.type === "matching" ? (
+              <div className="mt-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className="text-[0.72rem] font-semibold text-muted">
+                    Parovi — učenik na testu ne vidi ovaj redoslijed desno
+                  </p>
+                  <span className="font-data text-[0.7rem] text-muted">
+                    {(question.pairs ?? []).length}{" "}
+                    {(question.pairs ?? []).length === 1 ? "bod" : "boda"}
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {(question.pairs ?? []).map((pair, pairIndex) => (
+                    <div key={pairIndex} className="flex items-start gap-2">
+                      <span className="mt-2 grid h-6 w-6 shrink-0 place-items-center border border-rule bg-paper font-data text-[0.7rem] text-muted">
+                        {pairIndex + 1}
+                      </span>
+                      <input
+                        value={pair.left}
+                        onChange={(event) =>
+                          setPair(index, pairIndex, "left", event.target.value)
+                        }
+                        className="input"
+                        dir="auto"
+                        placeholder="Lijevo — npr. arapski izraz"
+                        aria-label={`Par ${pairIndex + 1}, lijevo`}
+                      />
+                      <span className="mt-2.5 text-muted" aria-hidden="true">
+                        =
+                      </span>
+                      <input
+                        value={pair.right}
+                        onChange={(event) =>
+                          setPair(index, pairIndex, "right", event.target.value)
+                        }
+                        className="input"
+                        dir="auto"
+                        placeholder="Desno — npr. prijevod"
+                        aria-label={`Par ${pairIndex + 1}, desno`}
+                      />
+                      <div className="flex flex-col">
+                        <button
+                          type="button"
+                          onClick={() => movePair(index, pairIndex, -1)}
+                          disabled={pairIndex === 0}
+                          className="btn btn-ghost !min-h-7 !p-1"
+                          aria-label="Pomjeri par gore"
+                        >
+                          <ArrowUp className="h-3 w-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => movePair(index, pairIndex, 1)}
+                          disabled={pairIndex === (question.pairs ?? []).length - 1}
+                          className="btn btn-ghost !min-h-7 !p-1"
+                          aria-label="Pomjeri par dolje"
+                        >
+                          <ArrowDown className="h-3 w-3" />
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removePair(index, pairIndex)}
+                        disabled={(question.pairs ?? []).length <= 2}
+                        className="btn btn-ghost !min-h-7 !p-1 hover:text-pencil"
+                        aria-label="Obriši par"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                {(question.pairs ?? []).length < 8 ? (
+                  <button
+                    type="button"
+                    onClick={() => addPair(index)}
+                    className="mt-2 text-xs font-semibold text-forest hover:text-forest-deep"
+                  >
+                    + Dodaj par
+                  </button>
+                ) : null}
+              </div>
             ) : (
               <div className="mt-3">
                 <p className="mb-2 text-[0.72rem] font-semibold text-muted">
-                  {question.type === "cloze"
-                    ? "Ponuđene riječi — označi tačnu"
-                    : "Opcije — označi tačnu"}
+                  {question.type === "cloze_multi"
+                    ? "Banka riječi — tačne i netačne, izmiješane"
+                    : question.type === "cloze"
+                      ? "Ponuđene riječi — označi tačnu"
+                      : "Opcije — označi tačnu"}
                 </p>
                 <div className="space-y-2">
                   {question.options.map((option, optionIndex) => {
-                    const selected = question.correct === optionIndex;
+                    const selected =
+                      question.type === "cloze_multi"
+                        ? (Array.isArray(question.correct)
+                            ? question.correct
+                            : []
+                          ).includes(optionIndex)
+                        : question.correct === optionIndex;
                     return (
                       <div key={optionIndex} className="flex items-center gap-2">
                         <button
                           type="button"
                           onClick={() => updateQuestion(index, withCorrect(question, optionIndex))}
+                          disabled={question.type === "cloze_multi"}
                           className={clsx(
                             "grid h-8 w-8 shrink-0 place-items-center border font-data text-xs transition-colors",
                             selected
                               ? "border-forest bg-forest text-paper"
                               : "border-rule bg-lift text-muted hover:border-forest/50",
+                            question.type === "cloze_multi" &&
+                              "cursor-default hover:border-rule",
                           )}
-                          aria-label={`Označi ${LETTERS[optionIndex]} kao tačan odgovor`}
+                          aria-label={
+                            question.type === "cloze_multi"
+                              ? "Tačne riječi se biraju dolje, po prazninama"
+                              : `Označi ${LETTERS[optionIndex]} kao tačan odgovor`
+                          }
                           aria-pressed={selected}
+                          tabIndex={question.type === "cloze_multi" ? -1 : 0}
                         >
                           {selected ? "•" : LETTERS[optionIndex]}
                         </button>
@@ -941,7 +1283,7 @@ export function QuizEditor({
                     );
                   })}
                 </div>
-                {question.options.length < 8 ? (
+                {question.options.length < 12 ? (
                   <button
                     type="button"
                     onClick={() => addOption(index)}
@@ -949,6 +1291,71 @@ export function QuizEditor({
                   >
                     + Dodaj opciju
                   </button>
+                ) : null}
+
+                {question.type === "cloze_multi" ? (
+                  <div className="mt-4 border-t border-rule-soft pt-3">
+                    <p className="mb-2 text-[0.72rem] font-semibold text-muted">
+                      Tačna riječ za svaku prazninu — redom kako se pojavljuju u
+                      tekstu
+                    </p>
+                    {countBlanks(question.prompt) === 0 ? (
+                      <p className="text-xs text-pencil">
+                        U tekstu još nema praznina. Napiši _____ na mjesta gdje
+                        nedostaje riječ.
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {Array.from({ length: countBlanks(question.prompt) }).map(
+                          (_, blankIndex) => {
+                            const answers = Array.isArray(question.correct)
+                              ? question.correct
+                              : [];
+                            const selected = answers[blankIndex] ?? -1;
+                            const usedElsewhere = answers.filter(
+                              (value, i) => value >= 0 && i !== blankIndex,
+                            );
+                            return (
+                              <div
+                                key={blankIndex}
+                                className="flex items-center gap-2"
+                              >
+                                <span className="grid h-8 w-8 shrink-0 place-items-center border border-rule bg-paper font-data text-xs text-muted">
+                                  {blankIndex + 1}
+                                </span>
+                                <select
+                                  value={selected}
+                                  onChange={(event) =>
+                                    setBlankAnswer(
+                                      index,
+                                      blankIndex,
+                                      Number(event.target.value),
+                                    )
+                                  }
+                                  dir="auto"
+                                  className="input"
+                                >
+                                  <option value={-1}>— izaberi riječ —</option>
+                                  {question.options.map((option, optionIndex) => (
+                                    <option
+                                      key={optionIndex}
+                                      value={optionIndex}
+                                      disabled={
+                                        !option.trim() ||
+                                        usedElsewhere.includes(optionIndex)
+                                      }
+                                    >
+                                      {option.trim() || `Opcija ${LETTERS[optionIndex]}`}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            );
+                          },
+                        )}
+                      </div>
+                    )}
+                  </div>
                 ) : null}
               </div>
             )}
